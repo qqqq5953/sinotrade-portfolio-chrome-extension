@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Portfolio vs VTI Demo</title>
+    <link rel="stylesheet" href="./demo.css" />
+  </head>
+  <body>
+    <div class="card">
+      <div class="row" style="align-items: center; justify-content: space-between">
+        <div>
+          <div style="font-weight: 700">Demo：解析表格 → 計算 → 插入圖表</div>
+          <div style="color: #6b7280; font-size: 13px">不打 Yahoo；用內建 fixture 價格表。</div>
+        </div>
+        <button id="btn">產生折線圖</button>
+      </div>
+    </div>
+
+    <div id="TagSelectArea" class="card">
+      <div class="card" style="margin: 0 0 12px 0">
+        <div style="font-weight: 700; margin-bottom: 8px">買入（buy-table）</div>
+        <div class="query-result-area">
+          <div class="buy-table-area">
+            <table class="buy-table default-table h5">
+              <thead>
+                <tr>
+                  <th>成交日</th>
+                  <th>股票名稱</th>
+                  <th></th>
+                  <th>成交股</th>
+                  <th>成交均價</th>
+                  <th>手續費</th>
+                  <th>投入成本</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>2024/01/03</td>
+                  <td>
+                    <div>
+                      <div class="td-item1">AAA</div>
+                      <div class="td-item2">AAA Corp</div>
+                    </div>
+                  </td>
+                  <td>AAA Corp</td>
+                  <td>1</td>
+                  <td>10</td>
+                  <td>0</td>
+                  <td>100</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin: 0">
+        <div style="font-weight: 700; margin-bottom: 8px">賣出（sell-table）</div>
+        <div class="query-result-area">
+          <div class="sell-table-area">
+            <table class="sell-table default-table h5">
+              <thead>
+                <tr>
+                  <th>成交日</th>
+                  <th>股票名稱</th>
+                  <th></th>
+                  <th>成交股</th>
+                  <th>成交均價</th>
+                  <th>損益</th>
+                  <th>報酬率</th>
+                  <th>投入成本</th>
+                  <th>交割金額</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>2024/01/10</td>
+                  <td>
+                    <div>
+                      <div class="td-item1">AAA</div>
+                      <div class="td-item2">AAA Corp</div>
+                    </div>
+                  </td>
+                  <td>AAA Corp</td>
+                  <td>1</td>
+                  <td>12</td>
+                  <td>20</td>
+                  <td>20%</td>
+                  <td>100</td>
+                  <td>100</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="./demo.js"></script>
+  </body>
+</html>
+
