@@ -86,3 +86,51 @@ export function parseYahooChartToPriceSeries(
   return series;
 }
 
+export interface YahooPriceSeriesPair {
+  close: PriceSeries;
+  adjclose: PriceSeries;
+}
+
+/**
+ * Parse Yahoo chart JSON into two separate series:
+ * - close: raw close (no fallback)
+ * - adjclose: adjusted close (no fallback)
+ *
+ * This is useful for fast switching between valuation bases without refetching.
+ */
+export function parseYahooChartToPriceSeriesPair(symbol: string, yahooJson: any): YahooPriceSeriesPair {
+  const result = yahooJson?.chart?.result?.[0];
+  if (!result) {
+    throw specError('YAHOO_PARSE', 'Missing chart.result[0]', { symbol });
+  }
+
+  const timestamps: unknown[] | undefined = result.timestamp;
+  const closes: (number | null)[] | undefined = result?.indicators?.quote?.[0]?.close;
+  const adjcloses: (number | null)[] | undefined = result?.indicators?.adjclose?.[0]?.adjclose;
+
+  if (!Array.isArray(timestamps) || !Array.isArray(closes)) {
+    throw specError('YAHOO_PARSE', 'Invalid timestamp/close arrays', { symbol });
+  }
+
+  const closeSeries: PriceSeries = new Map();
+  const adjSeries: PriceSeries = new Map();
+
+  for (let i = 0; i < timestamps.length; i += 1) {
+    const ts = timestamps[i];
+    if (typeof ts !== 'number') continue;
+    const isoDateET = formatIsoDateInET(ts);
+
+    const c = closes[i] ?? null;
+    if (typeof c === 'number' && Number.isFinite(c)) closeSeries.set(isoDateET, c);
+
+    const a = Array.isArray(adjcloses) ? (adjcloses[i] ?? null) : null;
+    if (typeof a === 'number' && Number.isFinite(a)) adjSeries.set(isoDateET, a);
+  }
+
+  if (closeSeries.size === 0 && adjSeries.size === 0) {
+    throw specError('YAHOO_EMPTY', 'Parsed empty close/adjclose series', { symbol });
+  }
+
+  return { close: closeSeries, adjclose: adjSeries };
+}
+

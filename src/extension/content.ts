@@ -1,6 +1,6 @@
 import {
   computePortfolioVsVtiSeriesWithDebug,
-  parseYahooChartToPriceSeries,
+  parseYahooChartToPriceSeriesPair,
   type PriceSeries,
   type TradeEvent
 } from '../core';
@@ -17,7 +17,7 @@ import {
   yearRangeText
 } from './collector';
 import { renderChart } from './chartMount';
-import { renderDebugTable } from './tableMount';
+import { renderDebugTable, renderPriceModeToggle, type PriceMode } from './tableMount';
 import { clearRunState, loadRunState, saveRunState } from './state';
 import { setStatus, setStatusDone, setStatusError } from './status';
 
@@ -35,6 +35,12 @@ const SELL_TABLE_SELECTOR = '.query-result-area .sell-table-area table.sell-tabl
 function uniq<T>(arr: T[]): T[] {
   return [...new Set(arr)];
 }
+
+type DualSeries = { close: PriceSeries; adjclose: PriceSeries };
+
+let cachedEvents: TradeEvent[] | null = null;
+let cachedByTicker: Map<string, DualSeries> | null = null;
+let priceMode: PriceMode = 'close'; // default per user request
 
 type YahooFetchResp = { ok: true; json: unknown } | { ok: false; error: string };
 
@@ -73,26 +79,85 @@ function yearStartIsoUtc(year: number): string {
 }
 
 async function fetchAndParseSeries(symbol: string, startYear: number, endYear: number): Promise<PriceSeries> {
-  // Fetch year by year to keep payload smaller and allow simple caching later.
+  // Backward-compatible (no longer used). Kept to avoid churn.
   const merged: PriceSeries = new Map();
   const currentUtcYear = new Date().getUTCFullYear();
   // Yahoo uses "-" for class shares, e.g. "BRK.B" -> "BRK-B".
   const yahooSymbol = symbol.replace(/\./g, '-');
   for (let y = startYear; y <= endYear; y += 1) {
     const period1 = yearStartIsoUtc(y);
-    // Yahoo period2 boundary: use next-year 01-01 for past years; for current year use today+1 buffer.
     const period2 = y === currentUtcYear ? isoDateUtcTodayPlusOne() : `${y + 1}-01-01`;
-    console.log('period1', period1, 'period2', period2, 'symbol', symbol);
     const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(
       yahooSymbol
     )}?formatted=true&includeAdjustedClose=true&interval=1d&period1=${Math.floor(Date.parse(period1) / 1000)}&period2=${Math.floor(
       Date.parse(period2) / 1000
     )}`;
     const json = await fetchYahooJsonViaSw(url);
-    const series = parseYahooChartToPriceSeries(symbol, json, { preferAdjClose: true });
-    for (const [k, v] of series) merged.set(k, v);
+    const pair = parseYahooChartToPriceSeriesPair(symbol, json);
+    for (const [k, v] of pair.close) merged.set(k, v);
   }
   return merged;
+}
+
+async function fetchAndParseSeriesPair(symbol: string, startYear: number, endYear: number): Promise<DualSeries> {
+  const mergedClose: PriceSeries = new Map();
+  const mergedAdj: PriceSeries = new Map();
+  const currentUtcYear = new Date().getUTCFullYear();
+  const yahooSymbol = symbol.replace(/\./g, '-');
+
+  for (let y = startYear; y <= endYear; y += 1) {
+    const period1 = yearStartIsoUtc(y);
+    const period2 = y === currentUtcYear ? isoDateUtcTodayPlusOne() : `${y + 1}-01-01`;
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(
+      yahooSymbol
+    )}?formatted=true&includeAdjustedClose=true&interval=1d&period1=${Math.floor(Date.parse(period1) / 1000)}&period2=${Math.floor(
+      Date.parse(period2) / 1000
+    )}`;
+    const json = await fetchYahooJsonViaSw(url);
+    const pair = parseYahooChartToPriceSeriesPair(symbol, json);
+    for (const [k, v] of pair.close) mergedClose.set(k, v);
+    for (const [k, v] of pair.adjclose) mergedAdj.set(k, v);
+  }
+
+  return { close: mergedClose, adjclose: mergedAdj };
+}
+
+function buildPriceSeriesByTicker(mode: PriceMode): Map<string, PriceSeries> {
+  if (!cachedByTicker) throw specError('NO_CACHE', 'Missing cached price series');
+  const out = new Map<string, PriceSeries>();
+  for (const [t, dual] of cachedByTicker) out.set(t, mode === 'close' ? dual.close : dual.adjclose);
+  return out;
+}
+
+function buildCloseAdjMaps(): { closeByTicker: Map<string, PriceSeries>; adjByTicker: Map<string, PriceSeries> } {
+  if (!cachedByTicker) throw specError('NO_CACHE', 'Missing cached price series');
+  const closeByTicker = new Map<string, PriceSeries>();
+  const adjByTicker = new Map<string, PriceSeries>();
+  for (const [t, dual] of cachedByTicker) {
+    closeByTicker.set(t, dual.close);
+    adjByTicker.set(t, dual.adjclose);
+  }
+  return { closeByTicker, adjByTicker };
+}
+
+function recomputeAndRender(): void {
+  if (!cachedEvents || !cachedByTicker) return;
+  const priceSeriesByTicker = buildPriceSeriesByTicker(priceMode);
+  const computed = computePortfolioVsVtiSeriesWithDebug({
+    events: cachedEvents,
+    priceSeriesByTicker,
+    maxBackTradingDays: 7,
+    anchorTicker: 'VTI'
+  });
+  renderChart(computed);
+
+  const { closeByTicker, adjByTicker } = buildCloseAdjMaps();
+  renderDebugTable(computed.debugRows, {
+    mode: priceMode,
+    closeSeriesByTicker: closeByTicker,
+    adjSeriesByTicker: adjByTicker,
+    anchorTicker: 'VTI'
+  });
 }
 
 function showError(err: unknown): void {
@@ -117,20 +182,30 @@ async function computeAndRender(events: any[]): Promise<void> {
   const startYear = Math.min(...events.map((e) => e.sourceYear));
   const endYear = Math.max(...events.map((e) => e.sourceYear));
 
-  const priceSeriesByTicker = new Map<string, PriceSeries>();
+  // Fetch once and cache both close/adjclose for fast toggle.
+  const byTicker = new Map<string, DualSeries>();
   for (const t of [...tickers, 'VTI']) {
-    const ps = await fetchAndParseSeries(t, startYear, endYear);
-    priceSeriesByTicker.set(t, ps);
+    const dual = await fetchAndParseSeriesPair(t, startYear, endYear);
+    byTicker.set(t, dual);
   }
 
-  const computed = computePortfolioVsVtiSeriesWithDebug({
-    events,
-    priceSeriesByTicker,
-    maxBackTradingDays: 7,
-    anchorTicker: 'VTI'
+  cachedEvents = events as TradeEvent[];
+  cachedByTicker = byTicker;
+
+  // Mount toggle and initial render (default: close).
+  renderPriceModeToggle(priceMode, (m) => {
+    if (priceMode === m) return;
+    priceMode = m;
+    // Update toggle UI to reflect active state.
+    renderPriceModeToggle(priceMode, (m2) => {
+      if (priceMode === m2) return;
+      priceMode = m2;
+      recomputeAndRender();
+    });
+    recomputeAndRender();
   });
-  renderChart(computed);
-  renderDebugTable(computed.debugRows);
+
+  recomputeAndRender();
 }
 
 async function startFlow(): Promise<void> {

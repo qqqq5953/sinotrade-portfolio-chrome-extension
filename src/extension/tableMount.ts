@@ -1,8 +1,11 @@
 import { mustQuery } from './dom';
-import type { DebugDayRow } from '../core';
+import type { DebugDayRow, PriceSeries } from '../core';
 
 const STYLE_ID = 'pvs-debug-table-style';
 const TABLE_ID = 'pvs-debug-table';
+const TOGGLE_ID = 'pvs-price-toggle';
+
+export type PriceMode = 'close' | 'adjclose';
 
 function ensureStyle(): void {
   if (document.getElementById(STYLE_ID)) return;
@@ -61,6 +64,30 @@ function ensureStyle(): void {
   color: #374151;
   background: #fff;
 }
+#${TOGGLE_ID} {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 0 0 0;
+}
+#${TOGGLE_ID} .btn {
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  border-radius: 10px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 12px;
+  color: #111827;
+}
+#${TOGGLE_ID} .btn.active {
+  border-color: #111827;
+  background: #111827;
+  color: #fff;
+}
+#${TOGGLE_ID} .hint {
+  font-size: 12px;
+  color: #6b7280;
+}
 `;
   document.head.appendChild(style);
 }
@@ -68,9 +95,30 @@ function ensureStyle(): void {
 function ensureContainerAfterChart(): HTMLDivElement {
   ensureStyle();
   const existing = document.getElementById(TABLE_ID) as HTMLDivElement | null;
-  if (existing) return existing;
+  const chart = document.getElementById('chart') as HTMLDivElement | null;
+  const tagArea = document.getElementById('TagSelectArea') as HTMLElement | null;
+  if (existing) {
+    // If chart exists, ensure the table is placed right after chart.
+    if (chart && existing.parentElement) {
+      const parent = chart.parentElement;
+      if (parent && existing !== chart.nextSibling) {
+        if (chart.nextSibling) parent.insertBefore(existing, chart.nextSibling);
+        else parent.appendChild(existing);
+      }
+    }
+    return existing;
+  }
 
-  const chart = mustQuery<HTMLDivElement>(document, '#chart');
+  // If chart isn't mounted yet, attach to TagSelectArea as a placeholder;
+  // later calls will reposition it after chart.
+  if (!chart) {
+    const host = tagArea ?? document.body;
+    const div = document.createElement('div');
+    div.id = TABLE_ID;
+    host.appendChild(div);
+    return div;
+  }
+
   const parent = chart.parentElement;
   if (!parent) throw new Error('Chart has no parent element');
 
@@ -81,6 +129,43 @@ function ensureContainerAfterChart(): HTMLDivElement {
   if (chart.nextSibling) parent.insertBefore(div, chart.nextSibling);
   else parent.appendChild(div);
 
+  return div;
+}
+
+function ensureToggleBeforeChart(): HTMLDivElement {
+  ensureStyle();
+  const existing = document.getElementById(TOGGLE_ID) as HTMLDivElement | null;
+  const chart = document.getElementById('chart') as HTMLDivElement | null;
+  const tagArea = document.getElementById('TagSelectArea') as HTMLElement | null;
+
+  // If already exists, ensure it is placed before chart when chart is available.
+  if (existing) {
+    if (chart && existing.parentElement) {
+      const parent = chart.parentElement;
+      if (parent && existing.nextSibling !== chart) {
+        parent.insertBefore(existing, chart);
+      }
+    }
+    return existing;
+  }
+
+  // If chart isn't mounted yet, attach to TagSelectArea as a placeholder;
+  // later calls will reposition it before chart.
+  if (!chart) {
+    const host = tagArea ?? document.body;
+    const div = document.createElement('div');
+    div.id = TOGGLE_ID;
+    // Prefer inserting near the top for visibility.
+    if (host.firstChild) host.insertBefore(div, host.firstChild);
+    else host.appendChild(div);
+    return div;
+  }
+
+  const parent = chart.parentElement;
+  if (!parent) throw new Error('Chart has no parent element');
+  const div = document.createElement('div');
+  div.id = TOGGLE_ID;
+  parent.insertBefore(div, chart);
   return div;
 }
 
@@ -107,10 +192,42 @@ function pricesSummary(row: DebugDayRow): string {
     .join('\n');
 }
 
-export function renderDebugTable(rows: DebugDayRow[]): void {
+function lookup(series: PriceSeries | undefined, isoDateET: string): number | null {
+  if (!series) return null;
+  const v = series.get(isoDateET);
+  return typeof v === 'number' && Number.isFinite(v) ? v : null;
+}
+
+export function renderPriceModeToggle(mode: PriceMode, onChange: (mode: PriceMode) => void): void {
+  const div = ensureToggleBeforeChart();
+  div.innerHTML = `
+    <button class="btn ${mode === 'close' ? 'active' : ''}" data-mode="close" type="button">Close</button>
+    <button class="btn ${mode === 'adjclose' ? 'active' : ''}" data-mode="adjclose" type="button">Adj Close</button>
+    <span class="hint">切換估值口徑（不會重抓資料，僅重算/更新圖表與表格）</span>
+  `;
+  div.querySelectorAll<HTMLButtonElement>('button[data-mode]').forEach((b) => {
+    b.onclick = () => {
+      const m = b.getAttribute('data-mode') as PriceMode | null;
+      if (!m) return;
+      onChange(m);
+    };
+  });
+}
+
+export function renderDebugTable(
+  rows: DebugDayRow[],
+  opts: {
+    mode: PriceMode;
+    closeSeriesByTicker: Map<string, PriceSeries>;
+    adjSeriesByTicker: Map<string, PriceSeries>;
+    anchorTicker?: string;
+  }
+): void {
   const div = ensureContainerAfterChart();
+  const anchorTicker = opts.anchorTicker ?? 'VTI';
+  const modeLabel = opts.mode === 'close' ? 'Close' : 'Adj Close';
   const note =
-    '顯示運算所用資料（事件、日期校正、取價與回補、持倉與估值）。若價格有回補，會標示使用的實際日期。';
+    `顯示運算所用資料（事件、日期校正、取價與回補、持倉與估值）。目前估值口徑：${modeLabel}。若價格有回補，會標示使用的實際日期。`;
 
   const html = `
     <div class="hdr">資料檢查表（Debug）</div>
@@ -124,8 +241,8 @@ export function renderDebugTable(rows: DebugDayRow[]): void {
             <th>anchorShifted</th>
             <th>events</th>
             <th>holdingsAfter</th>
-            <th>pricesUsed</th>
-            <th>VTI price</th>
+            <th>pricesUsed (close / adj)</th>
+            <th>${anchorTicker} price (close / adj)</th>
             <th>portfolioValue</th>
             <th>vtiShares</th>
             <th>vtiValue</th>
@@ -134,7 +251,23 @@ export function renderDebugTable(rows: DebugDayRow[]): void {
         <tbody>
           ${rows
             .map((r) => {
-              const vtiPrice = `${fmt(r.vtiPriceUsed.price)}${r.vtiPriceUsed.backfilled ? ` (←${r.vtiPriceUsed.usedIsoDateET})` : ''}`;
+              const usedVtiIso = r.vtiPriceUsed.usedIsoDateET;
+              const vtiClose = lookup(opts.closeSeriesByTicker.get(anchorTicker), usedVtiIso);
+              const vtiAdj = lookup(opts.adjSeriesByTicker.get(anchorTicker), usedVtiIso);
+              const vtiPrice = `close=${vtiClose == null ? '—' : fmt(vtiClose)} / adj=${vtiAdj == null ? '—' : fmt(vtiAdj)}${
+                r.vtiPriceUsed.backfilled ? ` (←${usedVtiIso})` : ''
+              }`;
+
+              const priceLines = r.portfolioPricesUsed
+                .map((p) => {
+                  const iso = p.usedIsoDateET;
+                  const c = lookup(opts.closeSeriesByTicker.get(p.ticker), iso);
+                  const a = lookup(opts.adjSeriesByTicker.get(p.ticker), iso);
+                  return `${p.ticker} close=${c == null ? '—' : fmt(c)} / adj=${a == null ? '—' : fmt(a)}${
+                    p.backfilled ? ` (←${iso})` : ''
+                  }`;
+                })
+                .join('\n');
               return `
                 <tr>
                   <td class="mono">${r.dayKeyIsoDateET}</td>
@@ -142,7 +275,7 @@ export function renderDebugTable(rows: DebugDayRow[]): void {
                   <td>${r.anchorShifted ? '<span class="tag">shifted</span>' : ''}</td>
                   <td class="mono">${eventSummary(r)}</td>
                   <td class="mono">${holdingsSummary(r)}</td>
-                  <td class="mono">${pricesSummary(r)}</td>
+                  <td class="mono">${priceLines || '(no holdings)'}</td>
                   <td class="mono">${vtiPrice}</td>
                   <td class="mono">${fmt(r.portfolioValue)}</td>
                   <td class="mono">${fmt(r.vtiShares)}</td>
