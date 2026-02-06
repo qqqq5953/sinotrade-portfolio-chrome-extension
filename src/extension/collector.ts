@@ -125,6 +125,63 @@ export async function waitForTableFirstDateInRange(
   );
 }
 
+export type WaitResult =
+  | { kind: 'table'; table: HTMLTableElement }
+  | { kind: 'no_data'; message: string };
+
+/**
+ * Wait until either:
+ * - the result table is updated to match the expected date range, OR
+ * - the page shows a "no data" banner for the selected range.
+ *
+ * This avoids hanging until timeout when the selected range has no trades.
+ */
+export async function waitForTableOrNoData(
+  tableSelector: string,
+  rangeText: string,
+  opts: { timeoutMs?: number; inputIdForEmptyCheck?: string; noDataSelector?: string } = {}
+): Promise<WaitResult> {
+  const { start: expectedStart, end: expectedEnd } = parseRangeStartEnd(rangeText);
+  const timeoutMs = opts.timeoutMs ?? 20_000;
+  const inputId = opts.inputIdForEmptyCheck;
+  const noDataSelector = opts.noDataSelector ?? '.query-result-area .no-data';
+
+  const inputHasRange = (): boolean => {
+    if (!inputId || !expectedStart || !expectedEnd) return true;
+    const input = document.querySelector(`#${inputId}`) as HTMLInputElement | null;
+    const v = input?.value ?? '';
+    return v.includes(expectedStart) && v.includes(expectedEnd);
+  };
+
+  return await waitFor(
+    () => {
+      const table = document.querySelector(tableSelector) as HTMLTableElement | null;
+      if (table) {
+        if (!expectedStart || !expectedEnd) return { kind: 'table', table };
+
+        const firstDate = getFirstRowTradeDate(table);
+        if (firstDate) {
+          const inRange = firstDate >= expectedStart && firstDate <= expectedEnd;
+          return inRange ? { kind: 'table', table } : null;
+        }
+
+        // Accept empty table when the input range is applied.
+        const rowCount = table.querySelectorAll('tbody tr').length;
+        if (rowCount === 0 && inputHasRange()) return { kind: 'table', table };
+      }
+
+      const noDataEl = document.querySelector(noDataSelector) as HTMLElement | null;
+      if (noDataEl && inputHasRange()) {
+        const msg = normalizeText(noDataEl.textContent ?? '');
+        if (msg) return { kind: 'no_data', message: msg };
+      }
+
+      return null;
+    },
+    { debugName: `table/no-data for ${rangeText}`, timeoutMs }
+  );
+}
+
 export async function scrollToLoadAllRows(table: HTMLTableElement): Promise<void> {
   // Try to find a scrollable container.
   let scroller: HTMLElement | null = table.parentElement;

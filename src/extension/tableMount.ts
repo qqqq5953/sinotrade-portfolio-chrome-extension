@@ -72,17 +72,21 @@ function ensureStyle(): void {
 }
 #${TOGGLE_ID} .btn {
   border: 1px solid #e5e7eb;
-  background: #fff;
+  background: #ffffff;
   border-radius: 10px;
   padding: 6px 10px;
   cursor: pointer;
   font-size: 12px;
   color: #111827;
 }
+#${TOGGLE_ID} .btn:hover {
+  background: #f9fafb;
+}
 #${TOGGLE_ID} .btn.active {
   border-color: #111827;
-  background: #111827;
-  color: #fff;
+  background: #ffffff;
+  color: #111827;
+  box-shadow: inset 0 0 0 1px #111827;
 }
 #${TOGGLE_ID} .hint {
   font-size: 12px;
@@ -240,6 +244,8 @@ export function renderDebugTable(
             <th>resolved</th>
             <th>anchorShifted</th>
             <th>events</th>
+            <th>dayCashTotal</th>
+            <th>vtiΔTotal</th>
             <th>holdingsAfter</th>
             <th>pricesUsed (close / adj)</th>
             <th>${anchorTicker} price (close / adj)</th>
@@ -274,6 +280,8 @@ export function renderDebugTable(
                   <td class="mono">${r.resolvedIsoDateET}</td>
                   <td>${r.anchorShifted ? '<span class="tag">shifted</span>' : ''}</td>
                   <td class="mono">${eventSummary(r)}</td>
+                  <td class="mono">${fmt(r.dayCashTotal)}</td>
+                  <td class="mono">${fmt(r.vtiDeltaSharesTotal)}</td>
                   <td class="mono">${holdingsSummary(r)}</td>
                   <td class="mono">${priceLines || '(no holdings)'}</td>
                   <td class="mono">${vtiPrice}</td>

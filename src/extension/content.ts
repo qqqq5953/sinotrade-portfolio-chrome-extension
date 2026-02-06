@@ -13,17 +13,19 @@ import {
   setDateRangeInput,
   switchToSellTab,
   triggerSubmitForm,
+  waitForTableOrNoData,
   waitForTableFirstDateInRange,
   yearRangeText
 } from './collector';
 import { renderChart } from './chartMount';
 import { renderDebugTable, renderPriceModeToggle, type PriceMode } from './tableMount';
 import { clearRunState, loadRunState, saveRunState } from './state';
-import { setStatus, setStatusDone, setStatusError } from './status';
+import { getStopEventName, setStatus, setStatusDone, setStatusError } from './status';
 
-// Temporary test range (per user request): only collect & compute within 2022/01/01~2022/12/31.
-const TEST_START_YEAR = 2022;
-const TEST_END_YEAR = 2022;
+// Temporary test range (per user request): 2025/01/01 ~ today.
+const TEST_START_YEAR = 2021;
+const TEST_END_YEAR = 2023;
+// const TEST_END_YEAR = new Date().getFullYear();
 
 declare const chrome: any;
 
@@ -114,6 +116,7 @@ async function fetchAndParseSeriesPair(symbol: string, startYear: number, endYea
       Date.parse(period2) / 1000
     )}`;
     const json = await fetchYahooJsonViaSw(url);
+    console.log('symbol', symbol, 'period1', period1, 'period2', period2, 'json', json);
     const pair = parseYahooChartToPriceSeriesPair(symbol, json);
     for (const [k, v] of pair.close) mergedClose.set(k, v);
     for (const [k, v] of pair.adjclose) mergedAdj.set(k, v);
@@ -242,11 +245,13 @@ async function resumeIfNeeded(): Promise<boolean> {
     const rangeText = state.rangeText ?? yearRangeText(y);
     setStatus(`解析買入資料中…（${rangeText}）`, { spinning: true });
 
-    const table = await waitForTableFirstDateInRange(BUY_TABLE_SELECTOR, rangeText, {
+    const res = await waitForTableOrNoData(BUY_TABLE_SELECTOR, rangeText, {
       inputIdForEmptyCheck: BUY_INPUT_ID
     });
-    await scrollToLoadAllRows(table);
-    const yearEvents = parseBuyEventsFromTable(table, { year: y, rangeText });
+    const yearEvents =
+      res.kind === 'table'
+        ? (await scrollToLoadAllRows(res.table), parseBuyEventsFromTable(res.table, { year: y, rangeText }))
+        : [];
 
     const merged = dedupeEvents([...(state.buyEvents ?? []), ...yearEvents]);
     try {
@@ -296,11 +301,13 @@ async function resumeIfNeeded(): Promise<boolean> {
     const rangeText = state.rangeText ?? yearRangeText(y);
     setStatus(`解析賣出資料中…（${rangeText}）`, { spinning: true });
 
-    const table = await waitForTableFirstDateInRange(SELL_TABLE_SELECTOR, rangeText, {
+    const res = await waitForTableOrNoData(SELL_TABLE_SELECTOR, rangeText, {
       inputIdForEmptyCheck: SELL_INPUT_ID
     });
-    await scrollToLoadAllRows(table);
-    const yearEvents = parseSellEventsFromTable(table, { year: y, rangeText });
+    const yearEvents =
+      res.kind === 'table'
+        ? (await scrollToLoadAllRows(res.table), parseSellEventsFromTable(res.table, { year: y, rangeText }))
+        : [];
     const mergedSell = dedupeEvents([...(state.sellEvents ?? []), ...yearEvents]);
     try {
       localStorage.setItem('pvs_debug_sellEvents_v1', JSON.stringify({ at: Date.now(), sell: mergedSell }));
@@ -372,9 +379,20 @@ function mountButton(): void {
 
 mountButton();
 
+// Manual stop/reset: clears persisted state so refresh won't resume.
+window.addEventListener(getStopEventName(), () => {
+  clearRunState()
+    .then(() => setStatusDone('已停止（狀態已重置）'))
+    .catch((e) => {
+      console.error(e);
+      setStatusError(`停止失敗：${e instanceof Error ? e.message : String(e)}`);
+    });
+});
+
 // Auto-resume if switching tab caused reload.
 resumeIfNeeded().catch((e) => {
   console.error(e);
-  setStatusError(`resumeIfNeeded-產生失敗：${e instanceof Error ? e.message : String(e)}`);
+  setStatusError(`resumeIfNeeded-產生失敗：${e instanceof Error ? e.message : String(e)}（已重置狀態）`);
+  clearRunState().catch((err) => console.error(err));
 });
 

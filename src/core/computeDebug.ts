@@ -56,6 +56,10 @@ export interface DebugDayRow {
   portfolioPricesUsed: DebugPriceUsed[];
   /** VTI price used for the day */
   vtiPriceUsed: DebugPriceUsed;
+  /** Sum of cash amounts for events on this day */
+  dayCashTotal: number;
+  /** Sum of VTI delta shares computed from cash for events on this day */
+  vtiDeltaSharesTotal: number;
   portfolioValue: number;
   vtiShares: number;
   vtiValue: number;
@@ -126,8 +130,12 @@ export function computePortfolioVsVtiSeriesWithDebug(inputs: ComputeWithDebugInp
     };
 
     const debugEvents: DebugEventUsed[] = [];
+    let dayCashTotal = 0;
+    let vtiDeltaSharesTotal = 0;
     for (const ev of dayEvents) {
+      dayCashTotal += ev.cash;
       const deltaShares = ev.cash / vtiLookup.price;
+      vtiDeltaSharesTotal += deltaShares;
       vtiShares += ev.type === 'BUY' ? deltaShares : -deltaShares;
       if (vtiShares < -1e-12) {
         throw specError('NEGATIVE_VTI', 'VTI shares would become negative', { ...ctxBase, vtiShares, event: ev });
@@ -177,6 +185,8 @@ export function computePortfolioVsVtiSeriesWithDebug(inputs: ComputeWithDebugInp
       holdingsAfter,
       portfolioPricesUsed,
       vtiPriceUsed,
+      dayCashTotal,
+      vtiDeltaSharesTotal,
       portfolioValue,
       vtiShares,
       vtiValue,

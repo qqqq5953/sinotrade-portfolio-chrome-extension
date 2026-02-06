@@ -2,6 +2,7 @@ import { mustQuery } from './dom';
 
 const STYLE_ID = 'portfolio-vti-status-style';
 const PANEL_ID = 'portfolio-vti-status';
+const STOP_EVENT = 'pvs_stop_and_reset';
 
 function ensureStyle(): void {
   if (document.getElementById(STYLE_ID)) return;
@@ -60,6 +61,19 @@ function ensureStyle(): void {
   cursor: pointer;
   font-size: 12px;
 }
+#${PANEL_ID} .stop {
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  border-radius: 8px;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 12px;
+}
+#${PANEL_ID} .btns {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
 `;
   document.head.appendChild(style);
 }
@@ -74,10 +88,16 @@ function ensurePanel(): HTMLDivElement {
   div.innerHTML = `
     <div class="hdr">
       <div class="row"><div class="spin" data-spin="1"></div><div>豐存股折線圖</div></div>
-      <button class="close" type="button">關閉</button>
+      <div class="btns">
+        <button class="stop" type="button">停止</button>
+        <button class="close" type="button">關閉</button>
+      </div>
     </div>
     <div class="body" data-body="1">準備中…</div>
   `;
+  div.querySelector<HTMLButtonElement>('button.stop')!.onclick = () => {
+    window.dispatchEvent(new CustomEvent(STOP_EVENT));
+  };
   div.querySelector<HTMLButtonElement>('button.close')!.onclick = () => div.remove();
   document.body.appendChild(div);
   return div;
@@ -103,5 +123,9 @@ export function setStatusError(text: string): void {
   body.style.color = '#991b1b';
   const spin = panel.querySelector('[data-spin="1"]') as HTMLElement | null;
   if (spin) spin.style.display = 'none';
+}
+
+export function getStopEventName(): string {
+  return STOP_EVENT;
 }
 
