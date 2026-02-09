@@ -5,7 +5,10 @@ type YahooFetchResp = { ok: true; json: unknown } | { ok: false; error: string }
 
 async function fetchJson(url: string): Promise<unknown> {
   const res = await fetch(url);
-  if (!res.ok) throw new Error(`Yahoo HTTP ${res.status}`);
+  if (!res.ok) {
+    console.log('===not ok===', { url, status: res.status });
+    throw new Error(`Yahoo HTTP ${res.status}`);
+  }
   return await res.json();
 }
 

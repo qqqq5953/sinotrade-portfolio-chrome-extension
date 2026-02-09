@@ -8,13 +8,10 @@ import { specError } from '../core/errors';
 import {
   dedupeEvents,
   parseBuyEventsFromTable,
-  parseSellEventsFromTable,
   scrollToLoadAllRows,
   setDateRangeInput,
-  switchToSellTab,
   triggerSubmitForm,
   waitForTableOrNoData,
-  waitForTableFirstDateInRange,
   yearRangeText
 } from './collector';
 import { renderChart } from './chartMount';
@@ -22,17 +19,14 @@ import { renderDebugTable, renderPriceModeToggle, type PriceMode } from './table
 import { clearRunState, loadRunState, saveRunState } from './state';
 import { getStopEventName, setStatus, setStatusDone, setStatusError } from './status';
 
-// Temporary test range (per user request): 2025/01/01 ~ today.
-const TEST_START_YEAR = 2021;
-const TEST_END_YEAR = 2023;
-// const TEST_END_YEAR = new Date().getFullYear();
+// BUY-only mode: compare incremental BUY cashflow performance
+// from the site's earliest allowed date (daterangepicker.minDate) to today.
+const DEFAULT_FALLBACK_START_YEAR = 2021;
 
 declare const chrome: any;
 
 const BUY_INPUT_ID = 'BuyInfo_QueryDateRange';
 const BUY_TABLE_SELECTOR = '.query-result-area .buy-table-area table.buy-table.default-table.h5';
-const SELL_INPUT_ID = 'SellInfo_QueryDateRange';
-const SELL_TABLE_SELECTOR = '.query-result-area .sell-table-area table.sell-table.default-table.h5';
 
 function uniq<T>(arr: T[]): T[] {
   return [...new Set(arr)];
@@ -45,6 +39,25 @@ let cachedByTicker: Map<string, DualSeries> | null = null;
 let priceMode: PriceMode = 'close'; // default per user request
 
 type YahooFetchResp = { ok: true; json: unknown } | { ok: false; error: string };
+
+function getMinDateYearFromPage(inputId: string): number {
+  try {
+    const w = window as unknown as { $?: any };
+    const $ = w.$;
+    if (typeof $ !== 'function') return DEFAULT_FALLBACK_START_YEAR;
+    const inst = $(`#${inputId}`)?.data?.('daterangepicker');
+    const md = inst?.minDate;
+    const y =
+      md && typeof md.year === 'function'
+        ? Number(md.year())
+        : typeof md === 'string'
+          ? Number((md.match(/(\d{4})/)?.[1] ?? ''))
+          : Number.NaN;
+    return Number.isFinite(y) && y > 1900 ? y : DEFAULT_FALLBACK_START_YEAR;
+  } catch {
+    return DEFAULT_FALLBACK_START_YEAR;
+  }
+}
 
 async function fetchYahooJsonViaSw(url: string): Promise<unknown> {
   if (typeof chrome === 'undefined' || !chrome?.runtime?.sendMessage) {
@@ -181,18 +194,22 @@ function showError(err: unknown): void {
 async function computeAndRender(events: any[]): Promise<void> {
   if (events.length === 0) throw specError('NO_EVENTS', 'No trade events found');
 
-  const tickers = uniq(events.map((e) => e.ticker));
-  const startYear = Math.min(...events.map((e) => e.sourceYear));
-  const endYear = Math.max(...events.map((e) => e.sourceYear));
+  // BUY-only: ignore all SELL events due to site history limitations.
+  const buyOnlyEvents = (events as TradeEvent[]).filter((e) => e.type === 'BUY');
+  if (buyOnlyEvents.length === 0) throw specError('NO_EVENTS', 'No BUY trade events found');
+
+  const tickers = uniq(buyOnlyEvents.map((e) => e.ticker));
+  const startYear = Math.min(...buyOnlyEvents.map((e) => e.sourceYear));
+  const endYear = Math.max(...buyOnlyEvents.map((e) => e.sourceYear));
 
   // Fetch once and cache both close/adjclose for fast toggle.
   const byTicker = new Map<string, DualSeries>();
-  for (const t of [...tickers, 'VTI']) {
+  for (const t of new Set<string>([...tickers, 'VTI'])) {
     const dual = await fetchAndParseSeriesPair(t, startYear, endYear);
     byTicker.set(t, dual);
   }
 
-  cachedEvents = events as TradeEvent[];
+  cachedEvents = buyOnlyEvents;
   cachedByTicker = byTicker;
 
   // Mount toggle and initial render (default: close).
@@ -213,10 +230,12 @@ async function computeAndRender(events: any[]): Promise<void> {
 
 async function startFlow(): Promise<void> {
   const startedAt = Date.now();
-  const y = TEST_START_YEAR;
+  const startYear = getMinDateYearFromPage(BUY_INPUT_ID);
+  const endYear = new Date().getFullYear();
+  const y = startYear;
   const rangeText = yearRangeText(y);
 
-  setStatus(`抓取買入資料中…（${rangeText}）`, { spinning: true });
+  setStatus(`抓取買入資料中…（${rangeText}）\n模式：BUY-only（SELL 事件不納入比較）`, { spinning: true });
   await setDateRangeInput(BUY_INPUT_ID, rangeText);
 
   // Persist BEFORE submitting because submit triggers a full reload (execution stops).
@@ -224,8 +243,8 @@ async function startFlow(): Promise<void> {
     v: 1,
     stage: 'buy_submitted',
     startedAt,
-    startYear: TEST_START_YEAR,
-    endYear: TEST_END_YEAR,
+    startYear,
+    endYear,
     cursorYear: y,
     rangeText,
     buyEvents: [],
@@ -239,11 +258,19 @@ async function resumeIfNeeded(): Promise<boolean> {
   const state = await loadRunState();
   if (!state || state.v !== 1) return false;
 
+  // BUY-only mode supports only buy_submitted -> computing. If an old state exists from
+  // previous versions (sell stages), reset it to avoid confusing auto-resume loops.
+  if (state.stage !== 'buy_submitted' && state.stage !== 'computing') {
+    await clearRunState();
+    setStatusDone('已重置舊版狀態，請重新點擊按鈕開始（BUY-only）');
+    return true;
+  }
+
   // If submit caused reload, resume from persisted stage.
   if (state.stage === 'buy_submitted') {
     const y = state.cursorYear;
     const rangeText = state.rangeText ?? yearRangeText(y);
-    setStatus(`解析買入資料中…（${rangeText}）`, { spinning: true });
+    setStatus(`解析買入資料中…（${rangeText}）\n模式：BUY-only（SELL 事件不納入比較）`, { spinning: true });
 
     const res = await waitForTableOrNoData(BUY_TABLE_SELECTOR, rangeText, {
       inputIdForEmptyCheck: BUY_INPUT_ID
@@ -261,76 +288,21 @@ async function resumeIfNeeded(): Promise<boolean> {
     if (y < state.endYear) {
       const nextYear = y + 1;
       const nextRange = yearRangeText(nextYear);
-      setStatus(`抓取買入資料中…（${nextRange}）`, { spinning: true });
+      setStatus(`抓取買入資料中…（${nextRange}）\n模式：BUY-only（SELL 事件不納入比較）`, { spinning: true });
       await setDateRangeInput(BUY_INPUT_ID, nextRange);
       await saveRunState({ ...state, stage: 'buy_submitted', cursorYear: nextYear, rangeText: nextRange, buyEvents: merged });
       triggerSubmitForm();
       return true;
     }
 
-    // Buy done → switch to sell tab (may reload). Persist stage BEFORE clicking.
-    await saveRunState({
-      ...state,
-      stage: 'need_sell_tab',
-      cursorYear: state.startYear,
-      buyEvents: merged
-    });
-    setStatus('切換到賣出頁面中…', { spinning: true });
-    await switchToSellTab();
-    return true;
-  }
-
-  if (state.stage === 'need_sell_tab') {
-    // After reload, ensure we are on sell tab.
-    if (!document.querySelector(`#${SELL_INPUT_ID}`)) {
-      setStatus('切換到賣出頁面中…', { spinning: true });
-      await switchToSellTab();
-      return true;
-    }
-    const y = state.startYear;
-    const rangeText = yearRangeText(y);
-    setStatus(`抓取賣出資料中…（${rangeText}）`, { spinning: true });
-    await setDateRangeInput(SELL_INPUT_ID, rangeText);
-    await saveRunState({ ...state, stage: 'sell_submitted', cursorYear: y, rangeText });
-    triggerSubmitForm();
-    return true;
-  }
-
-  if (state.stage === 'sell_submitted') {
-    const y = state.cursorYear;
-    const rangeText = state.rangeText ?? yearRangeText(y);
-    setStatus(`解析賣出資料中…（${rangeText}）`, { spinning: true });
-
-    const res = await waitForTableOrNoData(SELL_TABLE_SELECTOR, rangeText, {
-      inputIdForEmptyCheck: SELL_INPUT_ID
-    });
-    const yearEvents =
-      res.kind === 'table'
-        ? (await scrollToLoadAllRows(res.table), parseSellEventsFromTable(res.table, { year: y, rangeText }))
-        : [];
-    const mergedSell = dedupeEvents([...(state.sellEvents ?? []), ...yearEvents]);
+    // BUY-only: compute immediately after finishing buy collection.
+    const events: TradeEvent[] = merged;
     try {
-      localStorage.setItem('pvs_debug_sellEvents_v1', JSON.stringify({ at: Date.now(), sell: mergedSell }));
+      localStorage.setItem('pvs_debug_events_v1', JSON.stringify({ at: Date.now(), events, mode: 'BUY_ONLY' }));
     } catch {}
 
-    if (y < state.endYear) {
-      const nextYear = y + 1;
-      const nextRange = yearRangeText(nextYear);
-      setStatus(`抓取賣出資料中…（${nextRange}）`, { spinning: true });
-      await setDateRangeInput(SELL_INPUT_ID, nextRange);
-      await saveRunState({ ...state, stage: 'sell_submitted', cursorYear: nextYear, rangeText: nextRange, sellEvents: mergedSell });
-      triggerSubmitForm();
-      return true;
-    }
-
-    const buy = state.buyEvents ?? [];
-    const events: TradeEvent[] = [...buy, ...mergedSell];
-    try {
-      localStorage.setItem('pvs_debug_events_v1', JSON.stringify({ at: Date.now(), events }));
-    } catch {}
-
-    await saveRunState({ ...state, stage: 'computing', sellEvents: mergedSell });
-    setStatus('計算與產生圖表中…', { spinning: true });
+    await saveRunState({ ...state, stage: 'computing', buyEvents: merged });
+    setStatus('計算與產生圖表中…\n模式：BUY-only（SELL 事件不納入比較）', { spinning: true });
     await computeAndRender(events);
     await clearRunState();
     setStatusDone('已完成');

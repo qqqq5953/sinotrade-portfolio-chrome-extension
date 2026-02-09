@@ -44,6 +44,7 @@ export async function fetchYahooPriceSeries(
 
   const res = await fetch(url, signal ? { signal } : undefined);
   if (!res.ok) {
+    console.log('===not ok===', { symbol, status: res.status, url });
     throw specError('YAHOO_HTTP', `Yahoo HTTP ${res.status}`, { symbol, status: res.status, url });
   }
   return (await res.json()) as unknown;
