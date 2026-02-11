@@ -17,7 +17,8 @@ export const DEFAULT_PRICE_LOOKUP: PriceLookupOptions = {
 export function getPriceAtOrBefore(
   series: PriceSeries,
   isoDateET: string,
-  opts: PriceLookupOptions = DEFAULT_PRICE_LOOKUP
+  opts: PriceLookupOptions = DEFAULT_PRICE_LOOKUP,
+  ticker?: string
 ): { isoDateET: string; price: number; backfilled: boolean } {
   const direct = series.get(isoDateET);
   if (direct != null) return { isoDateET, price: direct, backfilled: false };
@@ -29,6 +30,7 @@ export function getPriceAtOrBefore(
     if (p != null) return { isoDateET: cur, price: p, backfilled: true };
   }
 
+  console.log('ticker', ticker, 'isoDateET', isoDateET, 'maxBackTradingDays', opts.maxBackTradingDays);
   throw specError('PRICE_MISSING', `Missing price for ${isoDateET}`, {
     isoDateET,
     maxBackTradingDays: opts.maxBackTradingDays

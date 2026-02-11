@@ -27,7 +27,6 @@ export async function waitFor<T>(
 }
 
 export function dispatchEnter(input: HTMLInputElement): void {
-  console.log('dispatchEnter', input);
   input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
   input.dispatchEvent(new KeyboardEvent('keypress', { key: 'Enter', bubbles: true }));
   input.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', bubbles: true }));

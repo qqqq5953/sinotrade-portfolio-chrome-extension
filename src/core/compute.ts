@@ -35,6 +35,7 @@ export interface ComputeInputs {
 }
 
 export function computePortfolioVsVtiSeries(inputs: ComputeInputs): ComputedSeries {
+  console.log('========= computePortfolioVsVtiSeries =========');
   const { events, priceSeriesByTicker } = inputs;
   const maxBackTradingDays = inputs.maxBackTradingDays ?? 7;
   const anchorTicker = inputs.anchorTicker ?? 'VTI';
@@ -59,6 +60,8 @@ export function computePortfolioVsVtiSeries(inputs: ComputeInputs): ComputedSeri
   const portfolio: { tsMs: number; value: number }[] = [];
   const vti: { tsMs: number; value: number }[] = [];
 
+  console.log('dayKeys', dayKeys);
+  
   for (const dayKey of dayKeys) {
     const dayEvents = byDay.get(dayKey) ?? [];
     // Resolve day using anchor (VTI) series first (timezone alignment).
@@ -77,10 +80,11 @@ export function computePortfolioVsVtiSeries(inputs: ComputeInputs): ComputedSeri
     // Portfolio value at resolved date
     let portfolioValue = 0;
     for (const [ticker, shares] of holdings) {
-      const ps = priceSeriesByTicker.get(ticker);
-      if (!ps) throw specError('MISSING_PRICE_SERIES', `Missing price series: ${ticker}`, { ...ctxBase, ticker });
-      const { price } = getPriceAtOrBefore(ps, resolvedIsoDateET, { maxBackTradingDays });
-      portfolioValue += shares * price;
+        console.log('ticker', ticker);
+        const ps = priceSeriesByTicker.get(ticker);
+        if (!ps) throw specError('MISSING_PRICE_SERIES', `Missing price series: ${ticker}`, { ...ctxBase, ticker });
+        const { price } = getPriceAtOrBefore(ps, resolvedIsoDateET, { maxBackTradingDays });
+        portfolioValue += shares * price;
     }
 
     // VTI updates at resolved date using *cash* (AI_SPEC #10)

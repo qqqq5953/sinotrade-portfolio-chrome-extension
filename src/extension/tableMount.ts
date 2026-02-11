@@ -1,9 +1,9 @@
-import { mustQuery } from './dom';
 import type { DebugDayRow, PriceSeries } from '../core';
 
 const STYLE_ID = 'pvs-debug-table-style';
 const TABLE_ID = 'pvs-debug-table';
 const TOGGLE_ID = 'pvs-price-toggle';
+const FETCH_ID = 'pvs-fetch-report';
 
 export type PriceMode = 'close' | 'adjclose';
 
@@ -173,6 +173,29 @@ function ensureToggleBeforeChart(): HTMLDivElement {
   return div;
 }
 
+function ensureFetchReportAfterToggle(): HTMLDivElement {
+  ensureStyle();
+  const existing = document.getElementById(FETCH_ID) as HTMLDivElement | null;
+  const toggle = document.getElementById(TOGGLE_ID) as HTMLDivElement | null;
+  const chart = document.getElementById('chart') as HTMLDivElement | null;
+  const tagArea = document.getElementById('TagSelectArea') as HTMLElement | null;
+
+  if (existing) {
+    if (toggle && toggle.parentElement && existing.parentElement && toggle.nextSibling !== existing) {
+      toggle.parentElement.insertBefore(existing, toggle.nextSibling);
+    }
+    return existing;
+  }
+
+  const host = (toggle?.parentElement ?? chart?.parentElement ?? tagArea ?? document.body) as HTMLElement;
+  const div = document.createElement('div');
+  div.id = FETCH_ID;
+  div.style.marginTop = '8px';
+  if (toggle && toggle.parentElement) toggle.parentElement.insertBefore(div, toggle.nextSibling);
+  else host.appendChild(div);
+  return div;
+}
+
 function fmt(n: number): string {
   if (!Number.isFinite(n)) return String(n);
   return n.toLocaleString('en-US', { maximumFractionDigits: 6 });
@@ -225,6 +248,19 @@ export function renderDebugTable(
     closeSeriesByTicker: Map<string, PriceSeries>;
     adjSeriesByTicker: Map<string, PriceSeries>;
     anchorTicker?: string;
+    fetchReport?: {
+      startedAt: number;
+      finishedAt?: number;
+      failedTickers: { ticker: string; reason: string }[];
+      logs: {
+        ticker: string;
+        year: number;
+        attempt: number;
+        maxAttempts: number;
+        outcome: 'ok' | 'retry' | 'fail';
+        error?: { kind: string; message: string; status?: number; url?: string };
+      }[];
+    };
   }
 ): void {
   const div = ensureContainerAfterChart();
@@ -300,3 +336,56 @@ export function renderDebugTable(
   div.innerHTML = html;
 }
 
+export function renderPriceFetchReport(report: {
+  startedAt: number;
+  finishedAt?: number;
+  failedTickers: { ticker: string; reason: string }[];
+  logs: {
+    ticker: string;
+    year: number;
+    attempt: number;
+    maxAttempts: number;
+    outcome: 'ok' | 'retry' | 'fail';
+    error?: { kind: string; message: string; status?: number; url?: string };
+  }[];
+}): void {
+  const div = ensureFetchReportAfterToggle();
+  const durMs = report.finishedAt ? report.finishedAt - report.startedAt : null;
+  const failed = report.failedTickers ?? [];
+  const headline = `抓價報告：${failed.length === 0 ? '全部成功' : `失敗 ${failed.length} 檔`}${
+    durMs == null ? '' : `（${(durMs / 1000).toFixed(1)}s）`
+  }`;
+
+  const failedLines =
+    failed.length === 0 ? '' : failed.map((f) => `- ${f.ticker}: ${f.reason}`).join('\n');
+
+  // Keep it compact: show only fail/retry logs (ok is usually noisy).
+  const interesting = (report.logs ?? []).filter((l) => l.outcome !== 'ok');
+  const logLines =
+    interesting.length === 0
+      ? ''
+      : interesting
+          .slice(-50)
+          .map((l) => {
+            const e = l.error;
+            const code = e?.kind ? `${e.kind}${e.status ? `(${e.status})` : ''}` : 'error';
+            return `- ${l.ticker} ${l.year} attempt ${l.attempt}/${l.maxAttempts} ${l.outcome}: ${code} ${e?.message ?? ''}`.trim();
+          })
+          .join('\n');
+
+  div.innerHTML = `
+    <div style="border:1px solid #e5e7eb; border-radius:12px; padding:10px 12px; background:#fff;">
+      <div style="font-weight:700; color:#111827; margin-bottom:6px;">${headline}</div>
+      ${
+        failedLines
+          ? `<div class="mono" style="white-space:pre-wrap; color:#991b1b; margin-bottom:6px;">${failedLines}</div>`
+          : `<div style="color:#374151; font-size:12px; margin-bottom:6px;">沒有偵測到失敗 ticker。</div>`
+      }
+      ${
+        logLines
+          ? `<div class="mono" style="white-space:pre-wrap; color:#374151; max-height:160px; overflow:auto;">${logLines}</div>`
+          : ''
+      }
+    </div>
+  `;
+}

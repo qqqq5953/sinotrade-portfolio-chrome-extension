@@ -55,6 +55,11 @@ export function parseYahooChartToPriceSeries(
   yahooJson: any,
   opts: YahooParseOptions = DEFAULT_PARSE_OPTS
 ): PriceSeries {
+  const chartErr = yahooJson?.chart?.error;
+  if (chartErr) {
+    console.log('===parseYahooChartToPriceSeries chartErr===', { symbol, chartError: chartErr });
+    throw specError('YAHOO_CHART_ERROR', 'Yahoo chart.error', { symbol, chartError: chartErr });
+  }
   const result = yahooJson?.chart?.result?.[0];
   if (!result) {
     throw specError('YAHOO_PARSE', 'Missing chart.result[0]', { symbol });
@@ -100,6 +105,11 @@ export interface YahooPriceSeriesPair {
  * This is useful for fast switching between valuation bases without refetching.
  */
 export function parseYahooChartToPriceSeriesPair(symbol: string, yahooJson: any): YahooPriceSeriesPair {
+  const chartErr = yahooJson?.chart?.error;
+  if (chartErr) {
+    console.log('===parseYahooChartToPriceSeriesPair chartErr===', { symbol, chartError: chartErr });
+    throw specError('YAHOO_CHART_ERROR', 'Yahoo chart.error', { symbol, chartError: chartErr });
+  }
   const result = yahooJson?.chart?.result?.[0];
   if (!result) {
     throw specError('YAHOO_PARSE', 'Missing chart.result[0]', { symbol });

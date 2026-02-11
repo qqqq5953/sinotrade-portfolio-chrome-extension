@@ -1,15 +1,34 @@
 declare const chrome: any;
 
 type YahooFetchMsg = { type: 'YAHOO_FETCH_JSON'; url: string };
-type YahooFetchResp = { ok: true; json: unknown } | { ok: false; error: string };
+type YahooProxyError = {
+  kind: 'http' | 'network' | 'unknown';
+  url: string;
+  message: string;
+  status?: number;
+};
+type YahooFetchResp = { ok: true; json: unknown } | { ok: false; error: YahooProxyError };
 
 async function fetchJson(url: string): Promise<unknown> {
-  const res = await fetch(url);
-  if (!res.ok) {
-    console.log('===not ok===', { url, status: res.status });
-    throw new Error(`Yahoo HTTP ${res.status}`);
+  try {
+    const res = await fetch(url);
+    if (!res.ok) {
+      console.log('===not ok===', { url, status: res.status });
+      const err: YahooProxyError = { kind: 'http', url, status: res.status, message: `Yahoo HTTP ${res.status}` };
+      throw err;
+    }
+    return await res.json();
+  } catch (e) {
+    // Re-throw our structured error if already in that shape.
+    if (e && typeof e === 'object' && 'kind' in e && 'url' in e && 'message' in e) throw e;
+    const msg = e instanceof Error ? e.message : String(e);
+    const err: YahooProxyError = {
+      kind: e instanceof TypeError ? 'network' : 'unknown',
+      url,
+      message: msg
+    };
+    throw err;
   }
-  return await res.json();
 }
 
 // Content scripts are subject to page CORS. Use the extension service worker as a proxy.
@@ -22,7 +41,10 @@ chrome.runtime.onMessage.addListener((msg: unknown, _sender: unknown, sendRespon
     const json = await fetchJson(url);
     sendResponse({ ok: true, json });
   })().catch((e) => {
-    const error = e instanceof Error ? e.message : String(e);
+    const error: YahooProxyError =
+      e && typeof e === 'object' && 'kind' in e && 'url' in e && 'message' in e
+        ? (e as YahooProxyError)
+        : { kind: 'unknown', url, message: e instanceof Error ? e.message : String(e) };
     sendResponse({ ok: false, error });
   });
 

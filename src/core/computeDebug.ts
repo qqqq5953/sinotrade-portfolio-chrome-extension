@@ -84,7 +84,11 @@ export interface ComputedSeriesWithDebug {
 }
 
 export function computePortfolioVsVtiSeriesWithDebug(inputs: ComputeWithDebugInputs): ComputedSeriesWithDebug {
+  console.log('========= computePortfolioVsVtiSeriesWithDebug =========');
+    
   const { events, priceSeriesByTicker } = inputs;
+  console.log('events', events);
+  console.log('priceSeriesByTicker', priceSeriesByTicker);
   const maxBackTradingDays = inputs.maxBackTradingDays ?? 7;
   const anchorTicker = inputs.anchorTicker ?? 'VTI';
 
@@ -107,6 +111,8 @@ export function computePortfolioVsVtiSeriesWithDebug(inputs: ComputeWithDebugInp
   const portfolio: { tsMs: number; value: number }[] = [];
   const vti: { tsMs: number; value: number }[] = [];
   const debugRows: DebugDayRow[] = [];
+
+  console.log('dayKeys', dayKeys);
 
   for (const dayKey of dayKeys) {
     const dayEvents = (byDay.get(dayKey) ?? []).slice();
@@ -160,7 +166,9 @@ export function computePortfolioVsVtiSeriesWithDebug(inputs: ComputeWithDebugInp
       holdingsAfter.push({ ticker, shares });
       const ps = priceSeriesByTicker.get(ticker);
       if (!ps) throw specError('MISSING_PRICE_SERIES', `Missing price series: ${ticker}`, { ...ctxBase, ticker });
-      const lookup = getPriceAtOrBefore(ps, resolvedIsoDateET, { maxBackTradingDays });
+      console.log('ticker', ticker);
+      console.log('ps', ps);
+      const lookup = getPriceAtOrBefore(ps, resolvedIsoDateET, { maxBackTradingDays }, ticker);
       portfolioPricesUsed.push({
         ticker,
         requestedIsoDateET: resolvedIsoDateET,
