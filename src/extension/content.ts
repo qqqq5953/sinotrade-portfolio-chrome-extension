@@ -93,7 +93,7 @@ async function fetchYahooJsonViaSw(url: string): Promise<{ ok: true; json: unkno
       error: { kind: 'unknown', url, message: 'chrome.runtime is not available (extension service worker not reachable)' }
     };
   }
-  return await new Promise((resolve, reject) => {
+  return await new Promise((resolve) => {
     chrome.runtime.sendMessage({ type: 'YAHOO_FETCH_JSON', url }, (resp: YahooFetchResp | undefined) => {
       const err = chrome.runtime?.lastError;
       if (err) {
@@ -182,27 +182,6 @@ async function fetchYahooJsonWithRetry(
 
   // Unreachable
   return { ok: false, error: { kind: 'unknown', url: args.url, message: 'retry loop exhausted unexpectedly' } };
-}
-
-async function fetchAndParseSeries(symbol: string, startYear: number, endYear: number): Promise<PriceSeries> {
-  // Backward-compatible (no longer used). Kept to avoid churn.
-  const merged: PriceSeries = new Map();
-  const currentUtcYear = new Date().getUTCFullYear();
-  // Yahoo uses "-" for class shares, e.g. "BRK.B" -> "BRK-B".
-  const yahooSymbol = symbol.replace(/\./g, '-');
-  for (let y = startYear; y <= endYear; y += 1) {
-    const period1 = yearStartIsoUtc(y);
-    const period2 = y === currentUtcYear ? isoDateUtcTodayPlusOne() : `${y + 1}-01-01`;
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(
-      yahooSymbol
-    )}?formatted=true&includeAdjustedClose=true&interval=1d&period1=${Math.floor(Date.parse(period1) / 1000)}&period2=${Math.floor(
-      Date.parse(period2) / 1000
-    )}`;
-    const json = await fetchYahooJsonViaSw(url);
-    const pair = parseYahooChartToPriceSeriesPair(symbol, json);
-    for (const [k, v] of pair.close) merged.set(k, v);
-  }
-  return merged;
 }
 
 async function fetchAndParseSeriesPair(

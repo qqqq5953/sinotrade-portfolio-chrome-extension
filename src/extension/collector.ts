@@ -1,4 +1,4 @@
-import { parseBuyTable, parseSellTable, type TradeEvent } from '../core';
+import { parseBuyTable, type TradeEvent } from '../core';
 import { specError } from '../core/errors';
 import { mustQuery, dispatchEnter, sleep, waitFor } from './dom';
 
@@ -89,40 +89,6 @@ function getFirstRowTradeDate(table: HTMLTableElement): string {
   if (!firstRow) return '';
   const td = firstRow.querySelectorAll('td')[idx] as HTMLTableCellElement | undefined;
   return extractYmdFromText(normalizeText(td?.textContent ?? ''));
-}
-
-export async function waitForTableFirstDateInRange(
-  tableSelector: string,
-  rangeText: string,
-  opts: { timeoutMs?: number; inputIdForEmptyCheck?: string } = {}
-): Promise<HTMLTableElement> {
-  const { start: expectedStart, end: expectedEnd } = parseRangeStartEnd(rangeText);
-  const timeoutMs = opts.timeoutMs ?? 20_000;
-  const inputId = opts.inputIdForEmptyCheck;
-
-  return await waitFor(
-    () => {
-      const table = document.querySelector(tableSelector) as HTMLTableElement | null;
-      if (!table) return null;
-      if (!expectedStart || !expectedEnd) return table;
-
-      const firstDate = getFirstRowTradeDate(table);
-      if (firstDate) {
-        const inRange = firstDate >= expectedStart && firstDate <= expectedEnd;
-        return inRange ? table : null;
-      }
-
-      // Accept empty results when the input range is applied (avoid dead-wait on years with no trades).
-      const rowCount = table.querySelectorAll('tbody tr').length;
-      if (rowCount === 0 && inputId) {
-        const input = document.querySelector(`#${inputId}`) as HTMLInputElement | null;
-        const v = input?.value ?? '';
-        if (v.includes(expectedStart) && v.includes(expectedEnd)) return table;
-      }
-      return null;
-    },
-    { debugName: `table updated for ${rangeText}`, timeoutMs }
-  );
 }
 
 export type WaitResult =
@@ -233,8 +199,3 @@ export async function switchToSellTab(): Promise<void> {
 export function parseBuyEventsFromTable(table: HTMLTableElement, ctx?: Record<string, unknown>): TradeEvent[] {
   return parseBuyTable(table, ctx);
 }
-
-export function parseSellEventsFromTable(table: HTMLTableElement, ctx?: Record<string, unknown>): TradeEvent[] {
-  return parseSellTable(table, ctx);
-}
-

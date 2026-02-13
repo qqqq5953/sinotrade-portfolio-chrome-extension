@@ -82,12 +82,3 @@ export function parseBuyTable(table: HTMLTableElement, ctx?: Record<string, unkn
     .map((tr, i) => parseTradeRow('BUY', tr, hmap, { ...ctx, rowIndex: i }))
     .filter(Boolean);
 }
-
-export function parseSellTable(table: HTMLTableElement, ctx?: Record<string, unknown>): TradeEvent[] {
-  const hmap = headerIndexMap(table);
-  const rows = Array.from(table.querySelectorAll('tbody tr')) as HTMLTableRowElement[];
-  return rows
-    .map((tr, i) => parseTradeRow('SELL', tr, hmap, { ...ctx, rowIndex: i }))
-    .filter(Boolean);
-}
-

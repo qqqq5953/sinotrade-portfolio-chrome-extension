@@ -212,13 +212,6 @@ function holdingsSummary(row: DebugDayRow): string {
   return row.holdingsAfter.map((h) => `${h.ticker}:${fmt(h.shares)}`).join(', ');
 }
 
-function pricesSummary(row: DebugDayRow): string {
-  if (row.portfolioPricesUsed.length === 0) return '(no holdings)';
-  return row.portfolioPricesUsed
-    .map((p) => `${p.ticker}=${fmt(p.price)}${p.backfilled ? ` (←${p.usedIsoDateET})` : ''}`)
-    .join('\n');
-}
-
 function lookup(series: PriceSeries | undefined, isoDateET: string): number | null {
   if (!series) return null;
   const v = series.get(isoDateET);

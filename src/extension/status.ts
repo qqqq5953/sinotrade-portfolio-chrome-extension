@@ -1,5 +1,3 @@
-import { mustQuery } from './dom';
-
 const STYLE_ID = 'portfolio-vti-status-style';
 const PANEL_ID = 'portfolio-vti-status';
 const STOP_EVENT = 'pvs_stop_and_reset';

@@ -1,5 +1,5 @@
 import * as echarts from 'echarts';
-import { computePortfolioVsVtiSeries, buildEchartsOption, parseBuyTable, parseSellTable } from './core';
+import { computePortfolioVsVtiSeries, buildEchartsOption, parseBuyTable } from './core';
 import type { PriceSeries } from './core/types';
 
 function must<T extends Element>(selector: string): T {
@@ -43,8 +43,7 @@ function fixturePrices(): Map<string, PriceSeries> {
 
 function runDemo(): void {
   const buyTable = must<HTMLTableElement>('.buy-table');
-  const sellTable = must<HTMLTableElement>('.sell-table');
-  const events = [...parseBuyTable(buyTable, { demo: true }), ...parseSellTable(sellTable, { demo: true })];
+  const events = [...parseBuyTable(buyTable, { demo: true })];
 
   const computed = computePortfolioVsVtiSeries({
     events,
