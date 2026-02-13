@@ -220,6 +220,18 @@ export type Holdings = Map<string, number>; // ticker -> shares
 
 > 備註：ECharts `xAxis.type='date'` 時，通常 series data 也可用 `[time,value]` pair；本專案可沿用 RAW_SPEC 以 `xAxis.data + series.data` 形式輸出，但需確保日期字串可被 ECharts parse。
 
+### 7.5 實作對照：共用核心迴圈（core）與 Debug tracer
+
+為了避免「正常版計算」與「Debug 表格版計算」的邏輯分岔，本專案把完整的逐日流程抽成單一核心函式，並以 tracer 注入方式提供 debug 資訊：
+
+- **核心實作（單一真實來源）**：`src/core/computeShared.ts` 的 `computePortfolioVsVtiCore()`
+  - 完整流程：排序 → 分日 → anchor 對齊（`resolveDateByAnchorPrice`）→ 套用 holdings → 取價（`getPriceAtOrBefore` 僅允許往前回補，避免 look-ahead）→ 計算 `portfolioValue / vtiShares / vtiValue`
+  - 支援可選的 `tracer.onDayComputed(trace)`：在每個 trade-day 完成後回報「當日實際用到的資料」（事件 traces、VTI 取價資訊、各持倉取價資訊、回補日期、當日現金總額等），供 UI Debug 表格使用
+- **最小輸出（不含 debug）**：`src/core/compute.ts` 的 `computePortfolioVsVtiSeries()`
+  - 只是呼叫 core 並回傳 `resolvedIsoDatesET / portfolio / vti`，供 `src/demo.ts` 與 `tests/run.ts` 使用
+- **Debug 輸出（含 debugRows）**：`src/core/computeDebug.ts` 的 `computePortfolioVsVtiSeriesWithDebug()`
+  - 呼叫 core 並注入 tracer，把 trace 轉成 `DebugDayRow[]` 供畫面「資料檢查表（Debug）」使用
+
 ---
 
 ## 8) UI 渲染與插入
