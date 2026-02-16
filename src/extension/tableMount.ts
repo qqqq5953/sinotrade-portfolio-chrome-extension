@@ -67,10 +67,15 @@ function ensureStyle(): void {
   background: #fff;
 }
 #${TOGGLE_ID} {
+  display: block;
+  margin: 10px 0 0 0;
+}
+#${TOGGLE_ID} .row {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin: 10px 0 0 0;
+  flex-wrap: wrap;
+  margin: 6px 0;
 }
 #${TOGGLE_ID} .btn {
   border: 1px solid #e5e7eb;
@@ -175,6 +180,31 @@ function ensureToggleBeforeChart(): HTMLDivElement {
   return div;
 }
 
+function ensureToggleRows(): { root: HTMLDivElement; valueRow: HTMLDivElement; priceRow: HTMLDivElement } {
+  const root = ensureToggleBeforeChart();
+  let valueRow = root.querySelector<HTMLDivElement>('div[data-row="value"]') ?? null;
+  let priceRow = root.querySelector<HTMLDivElement>('div[data-row="price"]') ?? null;
+
+  if (!valueRow) {
+    valueRow = document.createElement('div');
+    valueRow.className = 'row';
+    valueRow.setAttribute('data-row', 'value');
+    root.appendChild(valueRow);
+  }
+  if (!priceRow) {
+    priceRow = document.createElement('div');
+    priceRow.className = 'row';
+    priceRow.setAttribute('data-row', 'price');
+    root.appendChild(priceRow);
+  }
+
+  // Enforce order: value row first, then price row.
+  if (root.firstChild !== valueRow) root.insertBefore(valueRow, root.firstChild);
+  if (valueRow.nextSibling !== priceRow) root.insertBefore(priceRow, valueRow.nextSibling);
+
+  return { root, valueRow, priceRow };
+}
+
 function ensureFetchReportAfterToggle(): HTMLDivElement {
   ensureStyle();
   const existing = document.getElementById(FETCH_ID) as HTMLDivElement | null;
@@ -221,13 +251,13 @@ function lookup(series: PriceSeries | undefined, isoDateET: string): number | nu
 }
 
 export function renderPriceModeToggle(mode: PriceMode, onChange: (mode: PriceMode) => void): void {
-  const div = ensureToggleBeforeChart();
-  div.innerHTML = `
+  const { priceRow } = ensureToggleRows();
+  priceRow.innerHTML = `
     <button class="btn ${mode === 'close' ? 'active' : ''}" data-mode="close" type="button">Close</button>
     <button class="btn ${mode === 'adjclose' ? 'active' : ''}" data-mode="adjclose" type="button">Adj Close</button>
     <span class="hint">估值口徑（不會重抓資料，僅重算/更新圖表與表格）</span>
   `;
-  div.querySelectorAll<HTMLButtonElement>('button[data-mode]').forEach((b) => {
+  priceRow.querySelectorAll<HTMLButtonElement>('button[data-mode]').forEach((b) => {
     b.onclick = () => {
       const m = b.getAttribute('data-mode') as PriceMode | null;
       if (!m) return;
@@ -237,43 +267,30 @@ export function renderPriceModeToggle(mode: PriceMode, onChange: (mode: PriceMod
 }
 
 export function renderValueModeToggle(mode: ValueMode, onChange: (mode: ValueMode) => void): void {
-  const div = ensureToggleBeforeChart();
-  // Append value-mode buttons after price-mode buttons (do not clobber existing HTML).
-  // If the container was just created by renderPriceModeToggle, it already contains price buttons.
-  if (!div.querySelector('button[data-vmode]')) {
-    const span = document.createElement('span');
-    span.className = 'hint';
-    span.textContent = '｜顯示：';
-    div.appendChild(span);
+  const { valueRow } = ensureToggleRows();
+  valueRow.innerHTML = `
+    <button class="btn" data-vmode="amount" type="button" title="顯示投資組合與 VTI 的市值（金額）">市值</button>
+    <button class="btn" data-vmode="percent" type="button" title="投入報酬率% = (市值 / 累積投入金額 - 1) × 100%（投資組合與 VTI 皆以各自市值計）">投入報酬率%</button>
+    <button class="btn" data-vmode="excess" type="button" title="超額績效% = (投資組合市值 / VTI 市值 - 1) × 100%（相對 VTI 的超額績效%）">超額績效%</button>
+    <span class="hint" data-vdesc="1"></span>
+  `;
 
-    const btnPercent = document.createElement('button');
-    btnPercent.type = 'button';
-    btnPercent.className = 'btn';
-    btnPercent.setAttribute('data-vmode', 'percent');
-    btnPercent.textContent = '投入報酬%';
-    div.appendChild(btnPercent);
-
-    const btnExcess = document.createElement('button');
-    btnExcess.type = 'button';
-    btnExcess.className = 'btn';
-    btnExcess.setAttribute('data-vmode', 'excess');
-    btnExcess.textContent = '超額%';
-    div.appendChild(btnExcess);
-
-    const btnAmount = document.createElement('button');
-    btnAmount.type = 'button';
-    btnAmount.className = 'btn';
-    btnAmount.setAttribute('data-vmode', 'amount');
-    btnAmount.textContent = '金額';
-    div.appendChild(btnAmount);
-  }
-
-  div.querySelectorAll<HTMLButtonElement>('button[data-vmode]').forEach((b) => {
+  valueRow.querySelectorAll<HTMLButtonElement>('button[data-vmode]').forEach((b) => {
     const m = b.getAttribute('data-vmode') as ValueMode | null;
     if (!m) return;
     b.classList.toggle('active', m === mode);
     b.onclick = () => onChange(m);
   });
+
+  const desc = valueRow.querySelector('span[data-vdesc="1"]') as HTMLSpanElement | null;
+  if (desc) {
+    desc.textContent =
+      mode === 'amount'
+        ? '說明：顯示投資組合與 VTI 的市值（金額）'
+        : mode === 'percent'
+          ? '說明：投入報酬率% = (市值 / 累積投入金額 - 1) × 100%（投資組合與 VTI 皆以各自市值計）'
+          : '說明：超額績效% = (投資組合市值 / VTI 市值 - 1) × 100%（相對 VTI 的超額績效%）';
+  }
 }
 
 export function renderDebugTable(

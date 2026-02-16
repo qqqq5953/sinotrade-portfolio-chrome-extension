@@ -246,6 +246,38 @@ export type Holdings = Map<string, number>; // ticker -> shares
   - 需有獨立的 UI 區塊/面板顯示狀態：`抓取買入中` → `切換賣出中` → `抓取賣出中` → `計算/繪圖中` → `已完成`（失敗則顯示錯誤訊息）。
   - 按鈕（若存在）僅作為啟動入口，不承擔進度/完成狀態顯示。
 
+### 8.1 顯示模式（隱私）：市值 / 投入報酬率% / 超額績效%
+
+為了分享圖表時保護隱私，圖表提供 3 種顯示模式（只影響「呈現」，不影響核心計算與資料抓取）：
+
+1. **市值（金額）**  
+   - **顯示內容**：`portfolioValue` 與 `vtiValue` 的實際金額（y 軸為金額）。  
+   - **適合**：自己檢查與對帳。
+
+2. **投入報酬率%（value / 累積投入）**（隱私模式）  
+   - **定義**：以累積投入現金作為基準，顯示到當日的報酬率：  
+     \[
+     return\%(t)=\left(\frac{value_t}{cumulativeCash_t}-1\right)\times 100\%
+     \]
+     其中 \(cumulativeCash_t=\sum_{d \le t}{dayCashTotal_d}\)。  
+   - **例子**：若截至某日累積投入 \(cumulativeCash=20{,}000\)，當日市值 \(value=18{,}500\)，則  
+     \[
+     (18{,}500/20{,}000-1)\times 100\%=-7.5\%
+     \]
+   - **隱私規則**：tooltip 不顯示交易金額與 total trade value（只列 ticker）。
+
+3. **超額績效%（portfolio / vti）**（隱私模式）  
+   - **定義**：顯示 portfolio 相對 VTI 的超額幅度：  
+     \[
+     excess\%(t)=\left(\frac{portfolioValue_t}{vtiValue_t}-1\right)\times 100\%
+     \]
+   - **例子**：若某日 `portfolioValue=21,000`、`vtiValue=20,000`，則  
+     \[
+     (21{,}000/20{,}000-1)\times 100\%=+5\%
+     \]
+   - **圖表呈現**：可用一條「超額%」曲線，並加一條 0% baseline。  
+   - **隱私規則**：同上（不顯示交易金額）。
+
 ---
 
 ## 9) 錯誤處理與可觀測性
