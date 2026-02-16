@@ -19,9 +19,11 @@ function ensureChartContainer(): HTMLDivElement {
   return div;
 }
 
-export function renderChart(series: ComputedSeries): void {
+export type ChartValueMode = 'percent' | 'amount';
+
+export function renderChart(series: ComputedSeries, opts?: { valueMode?: ChartValueMode }): void {
   const container = ensureChartContainer();
   const chart = echarts.init(container);
-  chart.setOption(buildEchartsOption(series), { notMerge: true });
+  chart.setOption(buildEchartsOption(series, opts?.valueMode ? { valueMode: opts.valueMode } : undefined), { notMerge: true });
 }
 

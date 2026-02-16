@@ -1,11 +1,22 @@
 import type { ComputedSeries } from './types';
 
-type MaybeDebugRow = { events?: { type?: string; ticker?: string; cash?: number }[] };
+type MaybeDebugRow = {
+  events?: { type?: string; ticker?: string; cash?: number }[];
+  dayCashTotal?: number;
+};
 type MaybeWithDebug = ComputedSeries & { debugRows?: MaybeDebugRow[] };
+
+export type ChartValueMode = 'percent' | 'amount';
 
 function fmtNumber(n: unknown): string {
   if (typeof n !== 'number' || !Number.isFinite(n)) return String(n ?? '');
   return n.toLocaleString('en-US', { maximumFractionDigits: 6 });
+}
+
+function fmtPercent(n: unknown): string {
+  if (typeof n !== 'number' || !Number.isFinite(n)) return String(n ?? '');
+  const sign = n > 0 ? '+' : '';
+  return `${sign}${n.toLocaleString('en-US', { maximumFractionDigits: 4 })}%`;
 }
 
 function uniq<T>(arr: T[]): T[] {
@@ -28,8 +39,41 @@ function summarizeTradesByTicker(events: { ticker?: string; cash?: number }[]): 
   return { lines, total };
 }
 
-export function buildEchartsOption(series: ComputedSeries): any {
+function toReturnPctByCumulativeCash(
+  points: { tsMs: number; value: number }[],
+  debugRows: MaybeDebugRow[] | undefined
+): [number, number][] {
+  // Prefer (value / cumulativeCash - 1) for BUY-only incremental-invest flows.
+  // This avoids the misleading "value / firstValue" explosion when the portfolio keeps receiving new cash.
+  if (Array.isArray(debugRows) && debugRows.length === points.length) {
+    let cumCash = 0;
+    return points.map((p, i) => {
+      const dayCash = debugRows[i]?.dayCashTotal;
+      if (typeof dayCash === 'number' && Number.isFinite(dayCash)) cumCash += dayCash;
+      const denom = Math.abs(cumCash) > 1e-12 ? cumCash : null;
+      const pct = denom ? ((p.value / denom - 1) * 100) : 0;
+      return [p.tsMs, pct];
+    });
+  }
+
+  // Fallback: if debugRows isn't available (demo/tests), use the first point as baseline.
+  const base = points[0]?.value ?? 0;
+  const denom = typeof base === 'number' && Number.isFinite(base) && Math.abs(base) > 1e-12 ? base : null;
+  return points.map((p) => [p.tsMs, denom ? ((p.value / denom - 1) * 100) : 0]);
+}
+
+function toAmount(points: { tsMs: number; value: number }[]): [number, number][] {
+  return points.map((p) => [p.tsMs, p.value]);
+}
+
+export function buildEchartsOption(series: ComputedSeries, opts?: { valueMode?: ChartValueMode }): any {
   const dbg = (series as MaybeWithDebug).debugRows;
+  const valueMode: ChartValueMode = opts?.valueMode ?? 'amount';
+
+  const portfolioData =
+    valueMode === 'percent' ? toReturnPctByCumulativeCash(series.portfolio, dbg) : toAmount(series.portfolio);
+  const vtiData =
+    valueMode === 'percent' ? toReturnPctByCumulativeCash(series.vti, dbg) : toAmount(series.vti);
 
   const tooltipFormatter = (params: any): string => {
     const list = Array.isArray(params) ? params : [params];
@@ -46,8 +90,15 @@ export function buildEchartsOption(series: ComputedSeries): any {
       const { lines: tradeLines, total } = summarizeTradesByTicker(events);
       if (tickers.length > 0 || tradeLines.length > 0) {
         const sep = '<div style="border-top:1px solid #9ca3af; margin:6px 0;"></div>';
-        const body = tradeLines.length ? `${tradeLines.join('<br/>')}<br/>` : `${tickers.join('<br/>')}<br/>`;
-        tradesBlock = `${sep}${body}${sep}total trade value: ${fmtNumber(total)}<br/>`;
+        // Privacy: in percent mode, do NOT show trade cash amounts (still lists tickers).
+        const body =
+          valueMode === 'percent'
+            ? `${tickers.join('<br/>')}<br/>`
+            : tradeLines.length
+              ? `${tradeLines.join('<br/>')}<br/>`
+              : `${tickers.join('<br/>')}<br/>`;
+        const totalLine = valueMode === 'percent' ? '' : `total trade value: ${fmtNumber(total)}<br/>`;
+        tradesBlock = `${sep}${body}${sep}${totalLine}`;
       }
     }
 
@@ -55,7 +106,7 @@ export function buildEchartsOption(series: ComputedSeries): any {
       .map((p: any) => {
         const name = String(p?.seriesName ?? '');
         const v = Array.isArray(p?.value) ? p.value[1] : p?.value;
-        return `${name}: ${fmtNumber(v)}`;
+        return `${name}: ${valueMode === 'percent' ? fmtPercent(v) : fmtNumber(v)}`;
       })
       .join('<br/>');
 
@@ -69,19 +120,22 @@ export function buildEchartsOption(series: ComputedSeries): any {
     grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
     toolbox: { feature: { saveAsImage: {} } },
     xAxis: { type: 'time', boundaryGap: false },
-    yAxis: { type: 'value' },
+    yAxis:
+      valueMode === 'percent'
+        ? { type: 'value', axisLabel: { formatter: (v: number) => `${v}%` }, name: 'Return % (value / cumulativeCash - 1)' }
+        : { type: 'value' },
     series: [
       {
         name: 'portfolio',
         type: 'line',
         showSymbol: false,
-        data: series.portfolio.map((p) => [p.tsMs, p.value])
+        data: portfolioData
       },
       {
         name: 'vti',
         type: 'line',
         showSymbol: false,
-        data: series.vti.map((p) => [p.tsMs, p.value])
+        data: vtiData
       }
     ]
   };

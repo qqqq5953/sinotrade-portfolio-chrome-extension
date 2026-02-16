@@ -15,7 +15,14 @@ import {
   yearRangeText
 } from './collector';
 import { renderChart } from './chartMount';
-import { renderDebugTable, renderPriceFetchReport, renderPriceModeToggle, type PriceMode } from './tableMount';
+import {
+  renderDebugTable,
+  renderPriceFetchReport,
+  renderPriceModeToggle,
+  renderValueModeToggle,
+  type PriceMode,
+  type ValueMode
+} from './tableMount';
 import { clearRunState, loadRunState, saveRunState } from './state';
 import { getStopEventName, setStatus, setStatusDone, setStatusError } from './status';
 
@@ -23,7 +30,8 @@ import { getStopEventName, setStatus, setStatusDone, setStatusError } from './st
 // from the site's earliest allowed date (daterangepicker.minDate) to today.
 // Fallback when we cannot read daterangepicker.minDate from the page:
 // minDate is typically "currentYear - 5" (e.g. 2026 -> 2021).
-const DEFAULT_FALLBACK_START_YEAR = new Date().getFullYear() - 5;
+const DEFAULT_FALLBACK_START_YEAR = 2025;
+// const DEFAULT_FALLBACK_START_YEAR = new Date().getFullYear() - 5;
 
 declare const chrome: any;
 
@@ -39,6 +47,8 @@ type DualSeries = { close: PriceSeries; adjclose: PriceSeries };
 let cachedEvents: TradeEvent[] | null = null;
 let cachedByTicker: Map<string, DualSeries> | null = null;
 let priceMode: PriceMode = 'close'; // default per user request
+let valueMode: ValueMode = 'percent'; // default: privacy-first
+let cachedComputed: ReturnType<typeof computePortfolioVsVtiSeriesWithDebug> | null = null;
 
 type YahooProxyError = {
   kind: 'http' | 'network' | 'unknown';
@@ -68,22 +78,23 @@ type PriceFetchReport = {
 let cachedFetchReport: PriceFetchReport | null = null;
 
 function getMinDateYearFromPage(inputId: string): number {
-  try {
-    const w = window as unknown as { $?: any };
-    const $ = w.$; // 豐存股用 jquery
-    if (typeof $ !== 'function') return DEFAULT_FALLBACK_START_YEAR;
-    const instance = $(`#${inputId}`)?.data?.('daterangepicker');
-    const md = instance?.minDate;
-    const y =
-      md && typeof md.year === 'function'
-        ? Number(md.year())
-        : typeof md === 'string'
-          ? Number((md.match(/(\d{4})/)?.[1] ?? ''))
-          : Number.NaN;
-    return Number.isFinite(y) && y > 1900 ? y : DEFAULT_FALLBACK_START_YEAR;
-  } catch {
-    return DEFAULT_FALLBACK_START_YEAR;
-  }
+    return DEFAULT_FALLBACK_START_YEAR
+    try {
+        const w = window as unknown as { $?: any };
+        const $ = w.$; // 豐存股用 jquery
+        if (typeof $ !== 'function') return DEFAULT_FALLBACK_START_YEAR;
+        const instance = $(`#${inputId}`)?.data?.('daterangepicker');
+        const md = instance?.minDate;
+        const y =
+            md && typeof md.year === 'function'
+            ? Number(md.year())
+            : typeof md === 'string'
+                ? Number((md.match(/(\d{4})/)?.[1] ?? ''))
+                : Number.NaN;
+        return Number.isFinite(y) && y > 1900 ? y : DEFAULT_FALLBACK_START_YEAR;
+    } catch {
+        return DEFAULT_FALLBACK_START_YEAR;
+    }
 }
 
 async function fetchYahooJsonViaSw(url: string): Promise<{ ok: true; json: unknown } | { ok: false; error: YahooProxyError }> {
@@ -261,7 +272,8 @@ function recomputeAndRender(): void {
     maxBackTradingDays: 7,
     anchorTicker: 'VTI'
   });
-  renderChart(computed);
+  cachedComputed = computed;
+  renderChart(computed, { valueMode });
 
   const { closeByTicker, adjByTicker } = buildCloseAdjMaps();
   renderDebugTable(computed.debugRows, {
@@ -272,6 +284,28 @@ function recomputeAndRender(): void {
   });
 
   if (cachedFetchReport) renderPriceFetchReport(cachedFetchReport);
+}
+
+function rerenderChartOnly(): void {
+  if (!cachedComputed) return;
+  renderChart(cachedComputed, { valueMode });
+  if (cachedFetchReport) renderPriceFetchReport(cachedFetchReport);
+}
+
+function renderToggles(): void {
+  renderPriceModeToggle(priceMode, (m) => {
+    if (priceMode === m) return;
+    priceMode = m;
+    renderToggles();
+    recomputeAndRender();
+  });
+  renderValueModeToggle(valueMode, (m) => {
+    if (valueMode === m) return;
+    valueMode = m;
+    renderToggles();
+    // Value mode is presentation-only; keep it fast.
+    rerenderChartOnly();
+  });
 }
 
 function showError(err: unknown): void {
@@ -354,19 +388,8 @@ async function computeAndRender(events: any[]): Promise<void> {
   cachedByTicker = byTicker;
   cachedFetchReport = report;
 
-  // Mount toggle and initial render (default: close).
-  renderPriceModeToggle(priceMode, (m) => {
-    if (priceMode === m) return;
-    priceMode = m;
-    // Update toggle UI to reflect active state.
-    renderPriceModeToggle(priceMode, (m2) => {
-      if (priceMode === m2) return;
-      priceMode = m2;
-      recomputeAndRender();
-    });
-    recomputeAndRender();
-  });
-
+  // Mount toggles and initial render (default: Close + Percent).
+  renderToggles();
   recomputeAndRender();
 }
 

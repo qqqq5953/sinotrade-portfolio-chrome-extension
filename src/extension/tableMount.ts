@@ -6,6 +6,7 @@ const TOGGLE_ID = 'pvs-price-toggle';
 const FETCH_ID = 'pvs-fetch-report';
 
 export type PriceMode = 'close' | 'adjclose';
+export type ValueMode = 'percent' | 'amount';
 
 function ensureStyle(): void {
   if (document.getElementById(STYLE_ID)) return;
@@ -223,7 +224,7 @@ export function renderPriceModeToggle(mode: PriceMode, onChange: (mode: PriceMod
   div.innerHTML = `
     <button class="btn ${mode === 'close' ? 'active' : ''}" data-mode="close" type="button">Close</button>
     <button class="btn ${mode === 'adjclose' ? 'active' : ''}" data-mode="adjclose" type="button">Adj Close</button>
-    <span class="hint">切換估值口徑（不會重抓資料，僅重算/更新圖表與表格）</span>
+    <span class="hint">估值口徑（不會重抓資料，僅重算/更新圖表與表格）</span>
   `;
   div.querySelectorAll<HTMLButtonElement>('button[data-mode]').forEach((b) => {
     b.onclick = () => {
@@ -231,6 +232,39 @@ export function renderPriceModeToggle(mode: PriceMode, onChange: (mode: PriceMod
       if (!m) return;
       onChange(m);
     };
+  });
+}
+
+export function renderValueModeToggle(mode: ValueMode, onChange: (mode: ValueMode) => void): void {
+  const div = ensureToggleBeforeChart();
+  // Append value-mode buttons after price-mode buttons (do not clobber existing HTML).
+  // If the container was just created by renderPriceModeToggle, it already contains price buttons.
+  if (!div.querySelector('button[data-vmode]')) {
+    const span = document.createElement('span');
+    span.className = 'hint';
+    span.textContent = '｜顯示：';
+    div.appendChild(span);
+
+    const btnPercent = document.createElement('button');
+    btnPercent.type = 'button';
+    btnPercent.className = 'btn';
+    btnPercent.setAttribute('data-vmode', 'percent');
+    btnPercent.textContent = '%';
+    div.appendChild(btnPercent);
+
+    const btnAmount = document.createElement('button');
+    btnAmount.type = 'button';
+    btnAmount.className = 'btn';
+    btnAmount.setAttribute('data-vmode', 'amount');
+    btnAmount.textContent = '金額';
+    div.appendChild(btnAmount);
+  }
+
+  div.querySelectorAll<HTMLButtonElement>('button[data-vmode]').forEach((b) => {
+    const m = b.getAttribute('data-vmode') as ValueMode | null;
+    if (!m) return;
+    b.classList.toggle('active', m === mode);
+    b.onclick = () => onChange(m);
   });
 }
 
