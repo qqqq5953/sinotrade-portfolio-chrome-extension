@@ -269,9 +269,9 @@ export function renderPriceModeToggle(mode: PriceMode, onChange: (mode: PriceMod
 export function renderValueModeToggle(mode: ValueMode, onChange: (mode: ValueMode) => void): void {
   const { valueRow } = ensureToggleRows();
   valueRow.innerHTML = `
-    <button class="btn" data-vmode="amount" type="button" title="顯示投資組合與 VTI 的市值（金額）">市值</button>
-    <button class="btn" data-vmode="percent" type="button" title="投入報酬率% = (市值 / 累積投入金額 - 1) × 100%（投資組合與 VTI 皆以各自市值計）">投入報酬率%</button>
     <button class="btn" data-vmode="excess" type="button" title="超額績效% = (投資組合市值 / VTI 市值 - 1) × 100%（相對 VTI 的超額績效%）">超額績效%</button>
+    <button class="btn" data-vmode="percent" type="button" title="投入報酬率% = (市值 / 累積投入金額 - 1) × 100%（投資組合與 VTI 皆以各自市值計）">投入報酬率%</button>
+    <button class="btn" data-vmode="amount" type="button" title="顯示投資組合與 VTI 的市值（金額）">市值</button>
     <span class="hint" data-vdesc="1"></span>
   `;
 
