@@ -19,7 +19,7 @@ function ensureChartContainer(): HTMLDivElement {
   return div;
 }
 
-export type ChartValueMode = 'percent' | 'amount';
+export type ChartValueMode = 'percent' | 'excess' | 'amount';
 
 export function renderChart(series: ComputedSeries, opts?: { valueMode?: ChartValueMode }): void {
   const container = ensureChartContainer();

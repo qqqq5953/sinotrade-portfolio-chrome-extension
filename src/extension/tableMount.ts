@@ -6,7 +6,8 @@ const TOGGLE_ID = 'pvs-price-toggle';
 const FETCH_ID = 'pvs-fetch-report';
 
 export type PriceMode = 'close' | 'adjclose';
-export type ValueMode = 'percent' | 'amount';
+// Value mode controls chart display (privacy) only.
+export type ValueMode = 'amount' | 'percent' | 'excess';
 
 function ensureStyle(): void {
   if (document.getElementById(STYLE_ID)) return;
@@ -249,8 +250,15 @@ export function renderValueModeToggle(mode: ValueMode, onChange: (mode: ValueMod
     btnPercent.type = 'button';
     btnPercent.className = 'btn';
     btnPercent.setAttribute('data-vmode', 'percent');
-    btnPercent.textContent = '%';
+    btnPercent.textContent = '投入報酬%';
     div.appendChild(btnPercent);
+
+    const btnExcess = document.createElement('button');
+    btnExcess.type = 'button';
+    btnExcess.className = 'btn';
+    btnExcess.setAttribute('data-vmode', 'excess');
+    btnExcess.textContent = '超額%';
+    div.appendChild(btnExcess);
 
     const btnAmount = document.createElement('button');
     btnAmount.type = 'button';

@@ -47,7 +47,7 @@ type DualSeries = { close: PriceSeries; adjclose: PriceSeries };
 let cachedEvents: TradeEvent[] | null = null;
 let cachedByTicker: Map<string, DualSeries> | null = null;
 let priceMode: PriceMode = 'close'; // default per user request
-let valueMode: ValueMode = 'percent'; // default: privacy-first
+let valueMode: ValueMode = 'percent'; // default: privacy-first (return% by cumulative cash)
 let cachedComputed: ReturnType<typeof computePortfolioVsVtiSeriesWithDebug> | null = null;
 
 type YahooProxyError = {
