@@ -4,6 +4,7 @@ const STYLE_ID = 'pvs-debug-table-style';
 const TABLE_ID = 'pvs-debug-table';
 const TOGGLE_ID = 'pvs-price-toggle';
 const FETCH_ID = 'pvs-fetch-report';
+const RULES_ID = 'pvs-chart-rules';
 
 export type PriceMode = 'close' | 'adjclose';
 // Value mode controls chart display (privacy) only.
@@ -105,6 +106,22 @@ function ensureStyle(): void {
 #${TOGGLE_ID} .hint {
   font-size: 12px;
   color: #6b7280;
+}
+#${RULES_ID} {
+  margin: 8px 0 10px 0;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
+  padding: 8px 10px;
+  color: #374151;
+  font-size: 12px;
+}
+#${RULES_ID} ul {
+  margin: 0;
+  padding-left: 18px;
+}
+#${RULES_ID} li + li {
+  margin-top: 2px;
 }
 `;
   document.head.appendChild(style);
@@ -220,18 +237,55 @@ function ensureFetchReportAfterToggle(): HTMLDivElement {
   const tagArea = document.getElementById('TagSelectArea') as HTMLElement | null;
 
   if (existing) {
-    if (toggle && toggle.parentElement && existing.parentElement && toggle.nextSibling !== existing) {
-      toggle.parentElement.insertBefore(existing, toggle.nextSibling);
+    if (toggle && toggle.parentElement && existing.parentElement && existing.nextSibling !== toggle) {
+      toggle.parentElement.insertBefore(existing, toggle);
+    } else if (tagArea && existing.parentElement === tagArea && tagArea.firstChild !== existing) {
+      tagArea.insertBefore(existing, tagArea.firstChild);
     }
     return existing;
   }
 
-  const host = (toggle?.parentElement ?? chart?.parentElement ?? tagArea ?? document.body) as HTMLElement;
+  const host = (toggle?.parentElement ?? tagArea ?? chart?.parentElement ?? document.body) as HTMLElement;
   const div = document.createElement('div');
   div.id = FETCH_ID;
-  div.style.marginTop = '8px';
-  if (toggle && toggle.parentElement) toggle.parentElement.insertBefore(div, toggle.nextSibling);
+  div.style.margin = '0 0 8px 0';
+  if (toggle && toggle.parentElement) toggle.parentElement.insertBefore(div, toggle);
+  else if (host.firstChild) host.insertBefore(div, host.firstChild);
   else host.appendChild(div);
+  return div;
+}
+
+function ensureRulesBetweenToggleAndChart(): HTMLDivElement {
+  ensureStyle();
+  const existing = document.getElementById(RULES_ID) as HTMLDivElement | null;
+  const toggle = document.getElementById(TOGGLE_ID) as HTMLDivElement | null;
+  const chart = document.getElementById('chart') as HTMLDivElement | null;
+  const tagArea = document.getElementById('TagSelectArea') as HTMLElement | null;
+  const host = (toggle?.parentElement ?? chart?.parentElement ?? tagArea ?? document.body) as HTMLElement;
+
+  if (existing) {
+    if (toggle && toggle.parentElement) {
+      const anchor = toggle.nextSibling;
+      if (anchor !== existing) {
+        if (anchor) toggle.parentElement.insertBefore(existing, anchor);
+        else toggle.parentElement.appendChild(existing);
+      }
+    } else if (chart && chart.parentElement && existing.nextSibling !== chart) {
+      chart.parentElement.insertBefore(existing, chart);
+    }
+    return existing;
+  }
+
+  const div = document.createElement('div');
+  div.id = RULES_ID;
+  if (toggle && toggle.parentElement) {
+    if (toggle.nextSibling) toggle.parentElement.insertBefore(div, toggle.nextSibling);
+    else toggle.parentElement.appendChild(div);
+  } else if (chart && chart.parentElement) {
+    chart.parentElement.insertBefore(div, chart);
+  } else {
+    host.appendChild(div);
+  }
   return div;
 }
 
@@ -317,6 +371,16 @@ export function renderValueModeToggle(mode: ValueMode, onChange: (mode: ValueMod
   }
 }
 
+export function renderChartRules(): void {
+  const div = ensureRulesBetweenToggleAndChart();
+  const items = [
+    '比較規則：BUY-only（SELL 不納入比較）',
+    '拆股還原規則：僅套用 splitDate > tradeDate（同日不套用）',
+    '若價格有回補，會標示使用的實際日期'
+  ];
+  div.innerHTML = `<ul>${items.map((x) => `<li>${x}</li>`).join('')}</ul>`;
+}
+
 export function renderDebugTable(
   rows: DebugDayRow[],
   opts: {
@@ -343,17 +407,18 @@ export function renderDebugTable(
   const div = ensureContainerAfterChart();
   const anchorTicker = opts.anchorTicker ?? 'VTI';
   const modeLabel = opts.mode === 'close' ? 'Close' : 'Adj Close';
+  const noteTitle = '顯示運算所用資料（事件、日期校正、取價與回補、持倉與估值）'
   const noteItems = [
-    '顯示運算所用資料（事件、日期校正、取價與回補、持倉與估值）',
-    '比較規則：BUY-only（SELL 不納入比較）',
     `目前估值口徑：${modeLabel}`,
+    '比較規則：BUY-only（SELL 不納入比較）',
+    '拆股還原規則：僅套用 splitDate > tradeDate（同日不套用）',
     '若價格有回補，會標示使用的實際日期',
-    '拆股還原規則：僅套用 splitDate > tradeDate（同日不套用）'
   ];
 
   const html = `
     <div class="hdr">資料檢查表（Debug）</div>
     <div class="subhdr">
+      <div class="hint">${noteTitle}</div>
       <ul>${noteItems.map((x) => `<li>${x}</li>`).join('')}</ul>
     </div>
     <div style="overflow:auto; max-height: 520px;">

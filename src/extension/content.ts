@@ -19,6 +19,7 @@ import {
 } from './collector';
 import { renderChart } from './chartMount';
 import {
+  renderChartRules,
   renderDebugTable,
   renderPriceFetchReport,
   renderPriceModeToggle,
@@ -294,6 +295,8 @@ function recomputeAndRender(): void {
   });
   cachedComputed = computed;
   renderChart(computed, { valueMode });
+  // Re-anchor rules after chart mount/re-mount to keep it between toggles and chart.
+  renderChartRules();
 
   const { closeByTicker, adjByTicker } = buildCloseAdjMaps();
   renderDebugTable(computed.debugRows, {

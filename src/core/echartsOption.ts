@@ -139,18 +139,28 @@ export function buildEchartsOption(series: ComputedSeries, opts?: { valueMode?: 
   };
 
   return {
-    title: { text: 'Portfolio vs VTI' },
+    title: { text: 'Portfolio vs VTI', padding: [0, 0, 8, 0] },
     tooltip: { trigger: 'axis', formatter: tooltipFormatter },
     legend: { data: valueMode === 'excess' ? ['excess vs VTI', 'baseline'] : ['portfolio', 'vti'] },
-    grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+    grid: { left: '5%', right: '4%', bottom: '3%', containLabel: true },
     toolbox: { feature: { saveAsImage: {} } },
     xAxis: { type: 'time', boundaryGap: false },
     yAxis:
       valueMode === 'amount'
         ? { type: 'value' }
         : valueMode === 'percent'
-          ? { type: 'value', axisLabel: { formatter: (v: number) => `${v}%` }, name: 'Return % (value / cumulativeCash - 1)' }
-          : { type: 'value', axisLabel: { formatter: (v: number) => `${v}%` }, name: 'Excess % (portfolio / vti - 1)' },
+          ? {
+              type: 'value',
+              axisLabel: { formatter: (v: number) => `${v}%` },
+              name: 'Return % (value / cumulativeCash - 1)',
+              nameGap: 23
+            }
+          : {
+              type: 'value',
+              axisLabel: { formatter: (v: number) => `${v}%` },
+              name: 'Excess % (portfolio / vti - 1)',
+              nameGap: 23
+            },
     series: [
       {
         name: valueMode === 'excess' ? 'excess vs VTI' : 'portfolio',
