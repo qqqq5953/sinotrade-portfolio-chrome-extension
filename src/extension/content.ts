@@ -30,8 +30,8 @@ import { getStopEventName, setStatus, setStatusDone, setStatusError } from './st
 // from the site's earliest allowed date (daterangepicker.minDate) to today.
 // Fallback when we cannot read daterangepicker.minDate from the page:
 // minDate is typically "currentYear - 5" (e.g. 2026 -> 2021).
-const DEFAULT_FALLBACK_START_YEAR = 2025;
-// const DEFAULT_FALLBACK_START_YEAR = new Date().getFullYear() - 5;
+// const DEFAULT_FALLBACK_START_YEAR = 2025;
+const DEFAULT_FALLBACK_START_YEAR = new Date().getFullYear() - 5;
 
 declare const chrome: any;
 
@@ -47,7 +47,7 @@ type DualSeries = { close: PriceSeries; adjclose: PriceSeries };
 let cachedEvents: TradeEvent[] | null = null;
 let cachedByTicker: Map<string, DualSeries> | null = null;
 let priceMode: PriceMode = 'close'; // default per user request
-let valueMode: ValueMode = 'percent'; // default: privacy-first (return% by cumulative cash)
+let valueMode: ValueMode = 'excess';
 let cachedComputed: ReturnType<typeof computePortfolioVsVtiSeriesWithDebug> | null = null;
 
 type YahooProxyError = {
@@ -61,6 +61,8 @@ type YahooFetchResp = { ok: true; json: unknown } | { ok: false; error: YahooPro
 type PriceFetchAttemptLog = {
   ticker: string;
   year: number;
+  /** When set, this request covered year–endYear (one API call per ticker). */
+  endYear?: number;
   attempt: number;
   maxAttempts: number;
   url: string;
@@ -78,7 +80,7 @@ type PriceFetchReport = {
 let cachedFetchReport: PriceFetchReport | null = null;
 
 function getMinDateYearFromPage(inputId: string): number {
-    return DEFAULT_FALLBACK_START_YEAR
+    // return DEFAULT_FALLBACK_START_YEAR
     try {
         const w = window as unknown as { $?: any };
         const $ = w.$; // 豐存股用 jquery
@@ -149,12 +151,13 @@ function isRetriableYahooError(err: YahooProxyError): boolean {
 }
 
 async function fetchYahooJsonWithRetry(
-  args: { ticker: string; year: number; url: string },
+  args: { ticker: string; year: number; endYear?: number; url: string },
   report: PriceFetchReport,
   opts?: { maxRetries?: number }
 ): Promise<{ ok: true; json: unknown } | { ok: false; error: YahooProxyError }> {
   const maxRetries = opts?.maxRetries ?? 3; // total attempts = 1 + maxRetries
   const maxAttempts = 1 + maxRetries;
+  const yearLabel = args.endYear != null ? `${args.year}-${args.endYear}` : String(args.year);
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     const resp = await fetchYahooJsonViaSw(args.url);
@@ -162,6 +165,7 @@ async function fetchYahooJsonWithRetry(
       report.logs.push({
         ticker: args.ticker,
         year: args.year,
+        ...(args.endYear != null ? { endYear: args.endYear } : {}),
         attempt,
         maxAttempts,
         url: args.url,
@@ -175,6 +179,7 @@ async function fetchYahooJsonWithRetry(
     report.logs.push({
       ticker: args.ticker,
       year: args.year,
+      ...(args.endYear != null ? { endYear: args.endYear } : {}),
       attempt,
       maxAttempts,
       url: args.url,
@@ -185,7 +190,7 @@ async function fetchYahooJsonWithRetry(
     if (!retriable || isLast) return resp;
 
     const backoffMs = 1000 * Math.pow(2, attempt - 1); // 1s/2s/4s...
-    setStatus(`Yahoo 抓價重試中… ${args.ticker} (${args.year}) 第 ${attempt}/${maxAttempts} 次失敗，${backoffMs / 1000}s 後重試`, {
+    setStatus(`Yahoo 抓價重試中… ${args.ticker} (${yearLabel}) 第 ${attempt}/${maxAttempts} 次失敗，${backoffMs / 1000}s 後重試`, {
       spinning: true
     });
     await sleepMs(backoffMs);
@@ -206,41 +211,49 @@ async function fetchAndParseSeriesPair(
   const currentUtcYear = new Date().getUTCFullYear();
   const yahooSymbol = symbol.replace(/\./g, '-');
 
-  for (let y = startYear; y <= endYear; y += 1) {
-    const period1 = yearStartIsoUtc(y);
-    const period2 = y === currentUtcYear ? isoDateUtcTodayPlusOne() : `${y + 1}-01-01`;
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(
-      yahooSymbol
-    )}?formatted=true&includeAdjustedClose=true&interval=1d&period1=${Math.floor(Date.parse(period1) / 1000)}&period2=${Math.floor(
-      Date.parse(period2) / 1000
-    )}`;
+  const period1 = yearStartIsoUtc(startYear);
+  const period2 =
+    endYear === currentUtcYear ? isoDateUtcTodayPlusOne() : `${endYear + 1}-01-01`;
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(
+    yahooSymbol
+  )}?formatted=true&includeAdjustedClose=true&interval=1d&period1=${Math.floor(Date.parse(period1) / 1000)}&period2=${Math.floor(
+    Date.parse(period2) / 1000
+  )}`;
 
-    setStatus(`抓取股價中… ${symbol}（${y}）`, { spinning: true });
-    const resp = await fetchYahooJsonWithRetry({ ticker: symbol, year: y, url }, report);
-    if (!resp.ok) {
-      // Non-retriable or retriable exhausted.
-      throw specError('YAHOO_FETCH_FAILED', `Yahoo fetch failed: ${symbol} ${y}`, { symbol, year: y, error: resp.error, url });
-    }
-
-    let pair: ReturnType<typeof parseYahooChartToPriceSeriesPair>;
-    try {
-      pair = parseYahooChartToPriceSeriesPair(symbol, resp.json);
-    } catch (e) {
-      report.logs.push({
-        ticker: symbol,
-        year: y,
-        attempt: 1,
-        maxAttempts: 1,
-        url,
-        outcome: 'fail',
-        error: { kind: 'parse', message: e instanceof Error ? e.message : String(e) }
-      });
-      throw e;
-    }
-
-    for (const [k, v] of pair.close) mergedClose.set(k, v);
-    for (const [k, v] of pair.adjclose) mergedAdj.set(k, v);
+  setStatus(`抓取股價中… ${symbol}（${startYear}–${endYear}）`, { spinning: true });
+  const resp = await fetchYahooJsonWithRetry(
+    { ticker: symbol, year: startYear, endYear, url },
+    report
+  );
+  if (!resp.ok) {
+    throw specError('YAHOO_FETCH_FAILED', `Yahoo fetch failed: ${symbol} ${startYear}–${endYear}`, {
+      symbol,
+      startYear,
+      endYear,
+      error: resp.error,
+      url
+    });
   }
+
+  let pair: ReturnType<typeof parseYahooChartToPriceSeriesPair>;
+  try {
+    pair = parseYahooChartToPriceSeriesPair(symbol, resp.json);
+  } catch (e) {
+    report.logs.push({
+      ticker: symbol,
+      year: startYear,
+      endYear: endYear,
+      attempt: 1,
+      maxAttempts: 1,
+      url,
+      outcome: 'fail',
+      error: { kind: 'parse', message: e instanceof Error ? e.message : String(e) }
+    });
+    throw e;
+  }
+
+  for (const [k, v] of pair.close) mergedClose.set(k, v);
+  for (const [k, v] of pair.adjclose) mergedAdj.set(k, v);
 
   return { close: mergedClose, adjclose: mergedAdj };
 }
@@ -335,8 +348,8 @@ async function computeAndRender(events: any[]): Promise<void> {
   const globalMaxYear = Math.max(...buyOnlyEvents.map((e) => e.sourceYear));
 
   const yearRangeByTicker = new Map<string, { startYear: number; endYear: number }>();
-  for (const t of tickers) {
-    const years = buyOnlyEvents.filter((e) => e.ticker === t).map((e) => e.sourceYear);
+  for (const ticker of tickers) {
+    const years = buyOnlyEvents.filter((e) => e.ticker === ticker).map((e) => e.sourceYear);
     const minY = Math.min(...years);
     // Note: we intentionally do NOT add a "minY - 1" buffer year here.
     // If you later observe missing prices due to lookback across year boundary (early January events),
@@ -345,7 +358,7 @@ async function computeAndRender(events: any[]): Promise<void> {
     // IMPORTANT (BUY-only): if a ticker was bought in an earlier year but held into later years,
     // we still need prices through the overall compute horizon (globalMaxYear) for valuation.
     // Example: bought PG in 2021, held in 2022 => must fetch 2022 prices too.
-    yearRangeByTicker.set(t, { startYear: Math.max(1900, minY), endYear: globalMaxYear });
+    yearRangeByTicker.set(ticker, { startYear: Math.max(1900, minY), endYear: globalMaxYear });
   }
   // Anchor ticker (VTI) must cover the full date range.
   yearRangeByTicker.set('VTI', { startYear: Math.max(1900, globalMinYear), endYear: globalMaxYear });
@@ -357,28 +370,28 @@ async function computeAndRender(events: any[]): Promise<void> {
   console.log('===allTickers===', allTickers);
   const effectiveEvents: TradeEvent[] = [...buyOnlyEvents];
 
-  for (const t of allTickers) {
-    const r = yearRangeByTicker.get(t);
-    if (!r) continue;
+  for (const ticker of allTickers) {
+    const range = yearRangeByTicker.get(ticker);
+    if (!range) continue;
     try {
-      const dual = await fetchAndParseSeriesPair(t, r.startYear, r.endYear, report);
-      byTicker.set(t, dual);
+      const dual = await fetchAndParseSeriesPair(ticker, range.startYear, range.endYear, report);
+      byTicker.set(ticker, dual);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      report.failedTickers.push({ ticker: t, reason: msg });
+      report.failedTickers.push({ ticker: ticker, reason: msg });
 
       // Anchor ticker cannot be skipped.
-      if (t === 'VTI') throw e;
+      if (ticker === 'VTI') throw e;
 
       // Allow user to decide: stop or skip this ticker's events.
       const skip = window.confirm(
-        `抓價失敗：${t}\n原因：${msg}\n\n按「確定」跳過此 ticker 的事件繼續計算；按「取消」停止。`
+        `抓價失敗：${ticker}\n原因：${msg}\n\n按「確定」跳過此 ticker 的事件繼續計算；按「取消」停止。`
       );
       if (!skip) throw e;
 
       // Skip: remove all events for this ticker and do not include its price series.
       for (let i = effectiveEvents.length - 1; i >= 0; i -= 1) {
-        if (effectiveEvents[i]?.ticker === t) effectiveEvents.splice(i, 1);
+        if (effectiveEvents[i]?.ticker === ticker) effectiveEvents.splice(i, 1);
       }
     }
   }

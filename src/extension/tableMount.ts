@@ -307,6 +307,7 @@ export function renderDebugTable(
       logs: {
         ticker: string;
         year: number;
+        endYear?: number;
         attempt: number;
         maxAttempts: number;
         outcome: 'ok' | 'retry' | 'fail';
@@ -395,6 +396,7 @@ export function renderPriceFetchReport(report: {
   logs: {
     ticker: string;
     year: number;
+    endYear?: number;
     attempt: number;
     maxAttempts: number;
     outcome: 'ok' | 'retry' | 'fail';
@@ -421,7 +423,8 @@ export function renderPriceFetchReport(report: {
           .map((l) => {
             const e = l.error;
             const code = e?.kind ? `${e.kind}${e.status ? `(${e.status})` : ''}` : 'error';
-            return `- ${l.ticker} ${l.year} attempt ${l.attempt}/${l.maxAttempts} ${l.outcome}: ${code} ${e?.message ?? ''}`.trim();
+            const yearLabel = l.endYear != null ? `${l.year}-${l.endYear}` : String(l.year);
+            return `- ${l.ticker} ${yearLabel} attempt ${l.attempt}/${l.maxAttempts} ${l.outcome}: ${code} ${e?.message ?? ''}`.trim();
           })
           .join('\n');
 

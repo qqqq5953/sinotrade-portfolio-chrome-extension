@@ -22,7 +22,7 @@ function formatIsoDateInET(unixSeconds: number): string {
   const d = new Date(unixSeconds * 1000);
   // en-CA yields "YYYY-MM-DD"
   const fmt = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/New_York',
+    timeZone: 'America/New_York', // 這樣「一天」對應的是美東的交易日，和美股收盤日一致，不會因為 UTC 換日而錯到前一天或後一天。
     year: 'numeric',
     month: '2-digit',
     day: '2-digit'
@@ -131,11 +131,11 @@ export function parseYahooChartToPriceSeriesPair(symbol: string, yahooJson: any)
     if (typeof ts !== 'number') continue;
     const isoDateET = formatIsoDateInET(ts);
 
-    const c = closes[i] ?? null;
-    if (typeof c === 'number' && Number.isFinite(c)) closeSeries.set(isoDateET, c);
+    const close = closes[i] ?? null;
+    if (typeof close === 'number' && Number.isFinite(close)) closeSeries.set(isoDateET, close);
 
-    const a = Array.isArray(adjcloses) ? (adjcloses[i] ?? null) : null;
-    if (typeof a === 'number' && Number.isFinite(a)) adjSeries.set(isoDateET, a);
+    const adjclose = Array.isArray(adjcloses) ? (adjcloses[i] ?? null) : null;
+    if (typeof adjclose === 'number' && Number.isFinite(adjclose)) adjSeries.set(isoDateET, adjclose);
   }
 
   if (closeSeries.size === 0 && adjSeries.size === 0) {
