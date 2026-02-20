@@ -1,23 +1,121 @@
 {
-  "chart": {
-    "result": [
-      {
-        "timestamp": [1704171600, 1704258000],
-        "indicators": {
-          "quote": [
+    "chart": {
+        "result": [
             {
-              "close": [100, 102]
+                "meta": {
+                    "currency": "USD",
+                    "symbol": "NVDA",
+                    "exchangeName": "NMS",
+                    "fullExchangeName": "NasdaqGS",
+                    "instrumentType": "EQUITY",
+                    "firstTradeDate": 917015400,
+                    "regularMarketTime": 1771534801,
+                    "hasPrePostMarketData": true,
+                    "gmtoffset": -18000,
+                    "timezone": "EST",
+                    "exchangeTimezoneName": "America/New_York",
+                    "regularMarketPrice": 187.9,
+                    "fiftyTwoWeekHigh": 212.19,
+                    "fiftyTwoWeekLow": 86.62,
+                    "regularMarketDayHigh": 188.43,
+                    "regularMarketDayLow": 185.66,
+                    "regularMarketVolume": 124309275,
+                    "longName": "NVIDIA Corporation",
+                    "shortName": "NVIDIA Corporation",
+                    "chartPreviousClose": 14.927,
+                    "priceHint": 2,
+                    "currentTradingPeriod": {
+                        "pre": {
+                            "timezone": "EST",
+                            "start": 1771578000,
+                            "end": 1771597800,
+                            "gmtoffset": -18000
+                        },
+                        "regular": {
+                            "timezone": "EST",
+                            "start": 1771597800,
+                            "end": 1771621200,
+                            "gmtoffset": -18000
+                        },
+                        "post": {
+                            "timezone": "EST",
+                            "start": 1771621200,
+                            "end": 1771635600,
+                            "gmtoffset": -18000
+                        }
+                    },
+                    "dataGranularity": "1d",
+                    "range": "",
+                    "validRanges": [
+                        "1d",
+                        "5d",
+                        "1mo",
+                        "3mo",
+                        "6mo",
+                        "1y",
+                        "2y",
+                        "5y",
+                        "10y",
+                        "ytd",
+                        "max"
+                    ]
+                },
+                "timestamp": [
+                    1771534801,
+                    1771534801
+                ],
+                "events": {
+                    "splits": {
+                        "1626787800": {
+                            "date": 1626787800,
+                            "numerator": 4.0,
+                            "denominator": 1.0,
+                            "splitRatio": "4:1"
+                        },
+                        "1718026200": {
+                            "date": 1718026200,
+                            "numerator": 10.0,
+                            "denominator": 1.0,
+                            "splitRatio": "10:1"
+                        }
+                    }
+                },
+                "indicators": {
+                    "quote": [
+                        {
+                            "close": [
+                                187.9,
+                                187.9
+                            ],
+                            "volume": [
+                                124309275,
+                                124309275
+                            ],
+                            "high": [
+                                188.43,
+                                188.43
+                            ],
+                            "open": [
+                                187.9,
+                                187.9
+                            ],
+                            "low": [
+                                185.66,
+                                185.66
+                            ]
+                        }
+                    ],
+                    "adjclose": [
+                        {
+                            "adjclose": [
+                                187.9,
+                                187.9
+                            ]
+                        }
+                    ]
+                }
             }
-          ],
-          "adjclose": [
-            {
-              "adjclose": [101, 103]
-            }
-          ]
-        }
-      }
-    ],
-    "error": null
-  }
+        ],
+        "error": null
+    }
 }
-

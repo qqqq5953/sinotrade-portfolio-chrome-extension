@@ -1,8 +1,8 @@
 import {
   computePortfolioVsVtiSeriesWithDebug,
+  normalizeBuyEventsBySplits,
   parseYahooChartToPriceSeriesPair,
   parseYahooChartSplits,
-  type YahooChartResponse,
   type YahooSplitEvent,
   type PriceSeries,
   type TradeEvent
@@ -283,25 +283,6 @@ function buildCloseAdjMaps(): { closeByTicker: Map<string, PriceSeries>; adjByTi
   return { closeByTicker, adjByTicker };
 }
 
-function normalizeBuySharesBySplits(events: TradeEvent[], splitsByTicker: Map<string, YahooSplitEvent[]>): TradeEvent[] {
-  return events.map((e) => {
-    if (e.type !== 'BUY') return e;
-    const splits = splitsByTicker.get(e.ticker) ?? [];
-    if (splits.length === 0) return e;
-    const appliedSplits = splits.filter((s) => s.isoDateET > e.isoDateET);
-    const factor = appliedSplits.reduce((acc, s) => acc * s.factor, 1);
-    if (!Number.isFinite(factor) || factor <= 0 || factor === 1) return e;
-    const chain = appliedSplits.map((s) => `${s.isoDateET} x${Number.isInteger(s.factor) ? String(s.factor) : String(s.factor)}`);
-    return {
-      ...e,
-      splitAdjustedFromShares: e.shares,
-      splitFactorApplied: factor,
-      splitAppliedChain: chain,
-      shares: e.shares * factor
-    };
-  });
-}
-
 function recomputeAndRender(): void {
   if (!cachedEvents || !cachedByTicker) return;
   const priceSeriesByTicker = buildPriceSeriesByTicker(priceMode);
@@ -439,7 +420,7 @@ async function computeAndRender(events: any[]): Promise<void> {
     }
   }
   report.finishedAt = Date.now();
-  const normalizedEvents = normalizeBuySharesBySplits(effectiveEvents, splitsByTicker);
+  const normalizedEvents = normalizeBuyEventsBySplits(effectiveEvents, splitsByTicker);
 
   cachedEvents = normalizedEvents;
   cachedByTicker = byTicker;

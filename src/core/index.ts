@@ -8,4 +8,5 @@ export * from './compute';
 export * from './computeDebug';
 export * from './echartsOption';
 export * from './domParse';
+export * from './splits';
 

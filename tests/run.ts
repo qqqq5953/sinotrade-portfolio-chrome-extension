@@ -4,10 +4,14 @@ import path from 'node:path';
 
 import {
   computePortfolioVsVtiSeries,
+  normalizeBuyEventsBySplits,
   parseNumberStrict,
+  parseYahooChartSplits,
   parseYahooChartToPriceSeries,
+  parseYahooChartToPriceSeriesPair,
   toIsoDateETFromYmdSlash
 } from '../src/core';
+import type { YahooSplitEvent } from '../src/core';
 import type { PriceSeries, TradeEvent } from '../src/core/types';
 
 type TestFn = () => void | Promise<void>;
@@ -37,6 +41,168 @@ test('parseYahooChartToPriceSeries prefers adjclose by default', async () => {
   const ps = parseYahooChartToPriceSeries('VTI', json, { preferAdjClose: true });
   // The fixture contains one day where close=100 but adjclose=101.
   assert.equal(ps.get('2024-01-02'), 101);
+});
+
+test('parseYahooChartToPriceSeriesPair returns both close and adjclose maps', async () => {
+  const fixturePath = path.join(process.cwd(), 'tests', 'fixtures', 'yahoo.sample.json');
+  const json = JSON.parse(await readFile(fixturePath, 'utf8'));
+  const pair = parseYahooChartToPriceSeriesPair('VTI', json);
+  assert.equal(pair.close.get('2024-01-02'), 100);
+  assert.equal(pair.adjclose.get('2024-01-02'), 101);
+  assert.equal(pair.close.get('2024-01-03'), 102);
+  assert.equal(pair.adjclose.get('2024-01-03'), 103);
+});
+
+test('parseYahooChartSplits parses and sorts split events with factors', () => {
+  const json = {
+    chart: {
+      result: [
+        {
+          timestamp: [1704171600],
+          events: {
+            splits: {
+              // Intentionally out-of-order object keys; parser should sort by date asc.
+              '1718026200': {
+                date: 1718026200,
+                numerator: 10,
+                denominator: 1,
+                splitRatio: '10:1'
+              },
+              '1626787800': {
+                date: 1626787800,
+                numerator: 4,
+                denominator: 1,
+                splitRatio: '4:1'
+              },
+              '1189492200': {
+                date: 1189492200,
+                numerator: 1.5,
+                denominator: 1,
+                splitRatio: '1.5:1'
+              }
+            }
+          },
+          indicators: { quote: [{ close: [100] }] }
+        }
+      ],
+      error: null
+    }
+  };
+
+  const splits = parseYahooChartSplits('NVDA', json);
+  assert.equal(splits.length, 3);
+  assert.ok((splits[0]?.date ?? 0) < (splits[1]?.date ?? 0));
+  assert.ok((splits[1]?.date ?? 0) < (splits[2]?.date ?? 0));
+  assert.equal(splits[0]?.splitRatio, '1.5:1');
+  assert.equal(splits[0]?.factor, 1.5);
+  assert.equal(splits[1]?.splitRatio, '4:1');
+  assert.equal(splits[1]?.factor, 4);
+  assert.equal(splits[2]?.splitRatio, '10:1');
+  assert.equal(splits[2]?.factor, 10);
+});
+
+test('parseYahooChartSplits returns empty array when no split events', async () => {
+  const fixturePath = path.join(process.cwd(), 'tests', 'fixtures', 'yahoo.sample.json');
+  const json = JSON.parse(await readFile(fixturePath, 'utf8'));
+  const splits = parseYahooChartSplits('VTI', json);
+  assert.deepEqual(splits, []);
+});
+
+test('normalizeBuyEventsBySplits applies x40/x10 and keeps same-day split unapplied', () => {
+  const events: TradeEvent[] = [
+    {
+      type: 'BUY',
+      tradeDate: '2020/01/10',
+      isoDateET: '2020-01-10',
+      ticker: 'NVDA',
+      shares: 1,
+      cash: 100,
+      sourceYear: 2020
+    },
+    {
+      type: 'BUY',
+      tradeDate: '2022/07/26',
+      isoDateET: '2022-07-26',
+      ticker: 'NVDA',
+      shares: 2,
+      cash: 100,
+      sourceYear: 2022
+    },
+    {
+      type: 'BUY',
+      tradeDate: '2024/06/10',
+      isoDateET: '2024-06-10',
+      ticker: 'NVDA',
+      shares: 3,
+      cash: 100,
+      sourceYear: 2024
+    }
+  ];
+
+  const splitsByTicker = new Map<string, YahooSplitEvent[]>([
+    [
+      'NVDA',
+      [
+        { isoDateET: '2021-07-20', factor: 4, date: 1626787800, splitRatio: '4:1' },
+        { isoDateET: '2024-06-10', factor: 10, date: 1718026200, splitRatio: '10:1' }
+      ]
+    ]
+  ]);
+
+  const out = normalizeBuyEventsBySplits(events, splitsByTicker);
+  // Before 2021 split => 4 * 10 = 40x
+  assert.equal(out[0]?.shares, 40);
+  assert.equal(out[0]?.splitFactorApplied, 40);
+  assert.deepEqual(out[0]?.splitAppliedChain, ['2021-07-20 x4', '2024-06-10 x10']);
+
+  // Between 2021 and 2024 split => 10x
+  assert.equal(out[1]?.shares, 20);
+  assert.equal(out[1]?.splitFactorApplied, 10);
+  assert.deepEqual(out[1]?.splitAppliedChain, ['2024-06-10 x10']);
+
+  // Same day as split => not applied (strictly greater only)
+  assert.equal(out[2]?.shares, 3);
+  assert.equal(out[2]?.splitFactorApplied, undefined);
+});
+
+test('normalizeBuyEventsBySplits only affects BUY and matching ticker', () => {
+  const events: TradeEvent[] = [
+    {
+      type: 'BUY',
+      tradeDate: '2022/01/01',
+      isoDateET: '2022-01-01',
+      ticker: 'NVDA',
+      shares: 1,
+      cash: 100,
+      sourceYear: 2022
+    },
+    {
+      type: 'SELL',
+      tradeDate: '2022/01/02',
+      isoDateET: '2022-01-02',
+      ticker: 'NVDA',
+      shares: 1,
+      cash: 100,
+      sourceYear: 2022
+    },
+    {
+      type: 'BUY',
+      tradeDate: '2022/01/03',
+      isoDateET: '2022-01-03',
+      ticker: 'AAPL',
+      shares: 5,
+      cash: 100,
+      sourceYear: 2022
+    }
+  ];
+  const splitsByTicker = new Map<string, YahooSplitEvent[]>([
+    ['NVDA', [{ isoDateET: '2024-06-10', factor: 10, date: 1718026200, splitRatio: '10:1' }]]
+  ]);
+
+  const out = normalizeBuyEventsBySplits(events, splitsByTicker);
+  assert.equal(out[0]?.shares, 10); // NVDA BUY adjusted
+  assert.equal(out[1]?.shares, 1); // SELL unchanged
+  assert.equal(out[2]?.shares, 5); // other ticker unchanged
 });
 
 test('computePortfolioVsVtiSeries computes trade-day points with anchor date shift', () => {
