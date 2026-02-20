@@ -34,6 +34,13 @@ function ensureStyle(): void {
   color: #374151;
   font-size: 12px;
 }
+#${TABLE_ID} .subhdr ul {
+  margin: 0;
+  padding-left: 18px;
+}
+#${TABLE_ID} .subhdr li + li {
+  margin-top: 2px;
+}
 #${TABLE_ID} table {
   width: 100%;
   border-collapse: collapse;
@@ -336,12 +343,19 @@ export function renderDebugTable(
   const div = ensureContainerAfterChart();
   const anchorTicker = opts.anchorTicker ?? 'VTI';
   const modeLabel = opts.mode === 'close' ? 'Close' : 'Adj Close';
-  const note =
-    `顯示運算所用資料（事件、日期校正、取價與回補、持倉與估值）。比較規則：BUY-only（SELL 不納入比較）。目前估值口徑：${modeLabel}。若價格有回補，會標示使用的實際日期。`;
+  const noteItems = [
+    '顯示運算所用資料（事件、日期校正、取價與回補、持倉與估值）',
+    '比較規則：BUY-only（SELL 不納入比較）',
+    `目前估值口徑：${modeLabel}`,
+    '若價格有回補，會標示使用的實際日期',
+    '拆股還原規則：僅套用 splitDate > tradeDate（同日不套用）'
+  ];
 
   const html = `
     <div class="hdr">資料檢查表（Debug）</div>
-    <div class="subhdr">${note}</div>
+    <div class="subhdr">
+      <ul>${noteItems.map((x) => `<li>${x}</li>`).join('')}</ul>
+    </div>
     <div style="overflow:auto; max-height: 520px;">
       <table>
         <thead>
