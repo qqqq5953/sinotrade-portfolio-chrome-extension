@@ -23,6 +23,13 @@ import {
   type PriceMode,
   type ValueMode
 } from './tableMount';
+import {
+  getBuyEvents,
+  setBuyEvents,
+  getPriceSeries,
+  setPriceSeries,
+  cachedPriceToDualSeries
+} from './idb';
 import { clearRunState, loadRunState, saveRunState } from './state';
 import { getStopEventName, setStatus, setStatusDone, setStatusError } from './status';
 
@@ -374,7 +381,18 @@ async function computeAndRender(events: any[]): Promise<void> {
     const range = yearRangeByTicker.get(ticker);
     if (!range) continue;
     try {
-      const dual = await fetchAndParseSeriesPair(ticker, range.startYear, range.endYear, report);
+      const cached = await getPriceSeries(ticker);
+      const rangeCovered =
+        cached &&
+        cached.startYear <= range.startYear &&
+        cached.endYear >= range.endYear;
+      let dual: DualSeries;
+      if (rangeCovered) {
+        dual = cachedPriceToDualSeries(cached);
+      } else {
+        dual = await fetchAndParseSeriesPair(ticker, range.startYear, range.endYear, report);
+        await setPriceSeries(ticker, range.startYear, range.endYear, dual.close, dual.adjclose);
+      }
       byTicker.set(ticker, dual);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -479,6 +497,8 @@ async function resumeIfNeeded(): Promise<boolean> {
       localStorage.setItem('pvs_debug_events_v1', JSON.stringify({ at: Date.now(), events, mode: 'BUY_ONLY' }));
     } catch {}
 
+    await setBuyEvents(state.startYear, state.endYear, events);
+
     await saveRunState({ ...state, stage: 'computing', buyEvents: merged });
     setStatus('計算與產生圖表中…\n模式：BUY-only（SELL 事件不納入比較）', { spinning: true });
     await computeAndRender(events);
@@ -515,6 +535,20 @@ function mountButton(): void {
   btn.onclick = async () => {
     btn.disabled = true;
     try {
+      const startYear = getMinDateYearFromPage(BUY_INPUT_ID);
+      const endYear = new Date().getFullYear();
+      const cached = await getBuyEvents();
+      const cacheHit =
+        cached &&
+        cached.events.length > 0 &&
+        cached.startYear === startYear &&
+        cached.endYear === endYear;
+      if (cacheHit) {
+        setStatus('使用快取買入資料，計算與產生圖表中…', { spinning: true });
+        await computeAndRender(cached.events);
+        setStatusDone('已完成');
+        return;
+      }
       await clearRunState();
       await startFlow();
     } catch (e) {
