@@ -21,6 +21,13 @@ export interface YahooChartSplit {
   splitRatio: string;
 }
 
+export interface YahooSplitEvent {
+  isoDateET: string;
+  factor: number;
+  date: number;
+  splitRatio: string;
+}
+
 export interface YahooChartResult {
   meta?: Record<string, unknown>;
   timestamp?: number[];
@@ -74,7 +81,7 @@ export async function fetchYahooPriceSeries(
   const period2 = isoDateToUtcSeconds(range.endIsoDateUtc);
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(
     symbol
-  )}?formatted=true&includeAdjustedClose=true&interval=1d&period1=${period1}&period2=${period2}`;
+  )}?formatted=true&includeAdjustedClose=true&events=split&interval=1d&period1=${period1}&period2=${period2}`;
 
   const res = await fetch(url, signal ? { signal } : undefined);
   if (!res.ok) {
@@ -129,6 +136,40 @@ export function parseYahooChartToPriceSeries(
 export interface YahooPriceSeriesPair {
   close: PriceSeries;
   adjclose: PriceSeries;
+}
+
+export function parseYahooChartSplits(symbol: string, yahooJson: YahooChartResponse): YahooSplitEvent[] {
+  const chartErr = yahooJson.chart.error;
+  if (chartErr) {
+    console.log('===parseYahooChartSplits chartErr===', { symbol, chartError: chartErr });
+    throw specError('YAHOO_CHART_ERROR', 'Yahoo chart.error', { symbol, chartError: chartErr });
+  }
+  const result = yahooJson.chart.result?.[0];
+  if (!result) {
+    throw specError('YAHOO_PARSE', 'Missing chart.result[0]', { symbol });
+  }
+
+  const out: YahooSplitEvent[] = [];
+  const splits = result.events?.splits;
+  if (!splits) return out;
+
+  for (const s of Object.values(splits)) {
+    if (!s) continue;
+    if (typeof s.date !== 'number') continue;
+    if (typeof s.numerator !== 'number' || typeof s.denominator !== 'number') continue;
+    if (!Number.isFinite(s.numerator) || !Number.isFinite(s.denominator) || s.denominator === 0) continue;
+    const factor = s.numerator / s.denominator;
+    if (!Number.isFinite(factor) || factor <= 0) continue;
+    out.push({
+      isoDateET: formatIsoDateInET(s.date),
+      factor,
+      date: s.date,
+      splitRatio: s.splitRatio
+    });
+  }
+
+  out.sort((a, b) => a.date - b.date);
+  return out;
 }
 
 /**

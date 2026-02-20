@@ -17,6 +17,13 @@ export interface TradeEvent {
    */
   cash: number;
   sourceYear: number;
+  /**
+   * Debug-only metadata: when split normalization is applied, this stores the
+   * raw shares before adjustment and the cumulative split factor used.
+   */
+  splitAdjustedFromShares?: number;
+  splitFactorApplied?: number;
+  splitAppliedChain?: string[];
 }
 
 export type PriceSeries = Map<string, number>; // key: isoDateET

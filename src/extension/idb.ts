@@ -1,5 +1,6 @@
 import type { TradeEvent } from '../core';
 import type { PriceSeries } from '../core';
+import type { YahooSplitEvent } from '../core';
 
 const DB_NAME = 'pvs-cache-v1';
 const DB_VERSION = 1;
@@ -20,6 +21,7 @@ export interface CachedPriceSeries {
   /** Serialized: array of [isoDateET, price] */
   close: [string, number][];
   adjclose: [string, number][];
+  splits: YahooSplitEvent[];
 }
 
 function openDb(): Promise<IDBDatabase> {
@@ -90,7 +92,7 @@ export async function getPriceSeries(ticker: string): Promise<CachedPriceSeries 
     const req = store.get(ticker);
     req.onsuccess = () => {
       const row = req.result as CachedPriceSeries | undefined;
-      if (!row || !Array.isArray(row.close) || !Array.isArray(row.adjclose)) {
+      if (!row || !Array.isArray(row.close) || !Array.isArray(row.adjclose) || !Array.isArray(row.splits)) {
         resolve(null);
         return;
       }
@@ -107,7 +109,8 @@ export async function setPriceSeries(
   startYear: number,
   endYear: number,
   close: PriceSeries,
-  adjclose: PriceSeries
+  adjclose: PriceSeries,
+  splits: YahooSplitEvent[]
 ): Promise<void> {
   const closeArr: [string, number][] = Array.from(close.entries());
   const adjcloseArr: [string, number][] = Array.from(adjclose.entries());
@@ -120,7 +123,8 @@ export async function setPriceSeries(
       startYear,
       endYear,
       close: closeArr,
-      adjclose: adjcloseArr
+      adjclose: adjcloseArr,
+      splits
     });
     req.onsuccess = () => resolve();
     req.onerror = () => reject(req.error);

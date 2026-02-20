@@ -1,7 +1,9 @@
 import {
   computePortfolioVsVtiSeriesWithDebug,
   parseYahooChartToPriceSeriesPair,
+  parseYahooChartSplits,
   type YahooChartResponse,
+  type YahooSplitEvent,
   type PriceSeries,
   type TradeEvent
 } from '../core';
@@ -52,6 +54,7 @@ function uniq<T>(arr: T[]): T[] {
 }
 
 type DualSeries = { close: PriceSeries; adjclose: PriceSeries };
+type FetchedTickerData = DualSeries & { splits: YahooSplitEvent[] };
 
 let cachedEvents: TradeEvent[] | null = null;
 let cachedByTicker: Map<string, DualSeries> | null = null;
@@ -207,7 +210,7 @@ async function fetchAndParseSeriesPair(
   startYear: number,
   endYear: number,
   report: PriceFetchReport
-): Promise<DualSeries> {
+): Promise<FetchedTickerData> {
   const mergedClose: PriceSeries = new Map();
   const mergedAdj: PriceSeries = new Map();
   const currentUtcYear = new Date().getUTCFullYear();
@@ -218,7 +221,7 @@ async function fetchAndParseSeriesPair(
     endYear === currentUtcYear ? isoDateUtcTodayPlusOne() : `${endYear + 1}-01-01`;
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(
     yahooSymbol
-  )}?formatted=true&includeAdjustedClose=true&interval=1d&period1=${Math.floor(Date.parse(period1) / 1000)}&period2=${Math.floor(
+  )}?formatted=true&includeAdjustedClose=true&events=split&interval=1d&period1=${Math.floor(Date.parse(period1) / 1000)}&period2=${Math.floor(
     Date.parse(period2) / 1000
   )}`;
 
@@ -238,8 +241,10 @@ async function fetchAndParseSeriesPair(
   }
 
   let pair: ReturnType<typeof parseYahooChartToPriceSeriesPair>;
+  let splits: YahooSplitEvent[] = [];
   try {
     pair = parseYahooChartToPriceSeriesPair(symbol, resp.json);
+    splits = parseYahooChartSplits(symbol, resp.json);
   } catch (e) {
     report.logs.push({
       ticker: symbol,
@@ -257,7 +262,7 @@ async function fetchAndParseSeriesPair(
   for (const [k, v] of pair.close) mergedClose.set(k, v);
   for (const [k, v] of pair.adjclose) mergedAdj.set(k, v);
 
-  return { close: mergedClose, adjclose: mergedAdj };
+  return { close: mergedClose, adjclose: mergedAdj, splits };
 }
 
 function buildPriceSeriesByTicker(mode: PriceMode): Map<string, PriceSeries> {
@@ -276,6 +281,25 @@ function buildCloseAdjMaps(): { closeByTicker: Map<string, PriceSeries>; adjByTi
     adjByTicker.set(t, dual.adjclose);
   }
   return { closeByTicker, adjByTicker };
+}
+
+function normalizeBuySharesBySplits(events: TradeEvent[], splitsByTicker: Map<string, YahooSplitEvent[]>): TradeEvent[] {
+  return events.map((e) => {
+    if (e.type !== 'BUY') return e;
+    const splits = splitsByTicker.get(e.ticker) ?? [];
+    if (splits.length === 0) return e;
+    const appliedSplits = splits.filter((s) => s.isoDateET > e.isoDateET);
+    const factor = appliedSplits.reduce((acc, s) => acc * s.factor, 1);
+    if (!Number.isFinite(factor) || factor <= 0 || factor === 1) return e;
+    const chain = appliedSplits.map((s) => `${s.isoDateET} x${Number.isInteger(s.factor) ? String(s.factor) : String(s.factor)}`);
+    return {
+      ...e,
+      splitAdjustedFromShares: e.shares,
+      splitFactorApplied: factor,
+      splitAppliedChain: chain,
+      shares: e.shares * factor
+    };
+  });
 }
 
 function recomputeAndRender(): void {
@@ -367,6 +391,7 @@ async function computeAndRender(events: any[]): Promise<void> {
 
   // Fetch once and cache both close/adjclose for fast toggle.
   const byTicker = new Map<string, DualSeries>();
+  const splitsByTicker = new Map<string, YahooSplitEvent[]>();
   const report: PriceFetchReport = { startedAt: Date.now(), logs: [], failedTickers: [] };
   const allTickers = [...new Set<string>([...tickers, 'VTI'])];
   console.log('===allTickers===', allTickers);
@@ -382,13 +407,18 @@ async function computeAndRender(events: any[]): Promise<void> {
         cached.startYear <= range.startYear &&
         cached.endYear >= range.endYear;
       let dual: DualSeries;
+      let splits: YahooSplitEvent[] = [];
       if (rangeCovered) {
         dual = cachedPriceToDualSeries(cached);
+        splits = cached.splits;
       } else {
-        dual = await fetchAndParseSeriesPair(ticker, range.startYear, range.endYear, report);
-        await setPriceSeries(ticker, range.startYear, range.endYear, dual.close, dual.adjclose);
+        const fetched = await fetchAndParseSeriesPair(ticker, range.startYear, range.endYear, report);
+        dual = { close: fetched.close, adjclose: fetched.adjclose };
+        splits = fetched.splits;
+        await setPriceSeries(ticker, range.startYear, range.endYear, dual.close, dual.adjclose, splits);
       }
       byTicker.set(ticker, dual);
+      splitsByTicker.set(ticker, splits);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       report.failedTickers.push({ ticker: ticker, reason: msg });
@@ -409,8 +439,9 @@ async function computeAndRender(events: any[]): Promise<void> {
     }
   }
   report.finishedAt = Date.now();
+  const normalizedEvents = normalizeBuySharesBySplits(effectiveEvents, splitsByTicker);
 
-  cachedEvents = effectiveEvents;
+  cachedEvents = normalizedEvents;
   cachedByTicker = byTicker;
   cachedFetchReport = report;
 

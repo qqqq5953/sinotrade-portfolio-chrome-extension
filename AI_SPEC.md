@@ -8,9 +8,10 @@
 - **範圍內**：
   - 從頁面 UI 依年度篩選抓取買入/賣出歷史交易表格
   - 透過 Yahoo Finance 取得股價日 K（`interval=1d`）收盤價
+  - 從 Yahoo `events=split` 取得拆股事件，對 BUY 事件股數做拆股還原（以目前股本基準）
   - 合併事件、計算兩條序列、渲染圖表並插入到指定 DOM
 - **範圍外（本版不做）**：
-  - 股利/配息/拆股/合併等公司行動的精準處理（僅能透過 `adjclose` 做部分涵蓋，見「歧義/決策」）
+  - 股利/配息/合併（reverse split 以外的複雜公司行動）等完整企業行動精準回放
   - 自動登入、繞過驗證碼、突破站點防爬蟲
   - 任意日期補齊的每日曲線（本版只在交易日點更新）
 
@@ -128,7 +129,7 @@
 
 ### 5.1 API 形式（來源：RAW_SPEC）
 
-`https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?formatted=true&includeAdjustedClose=true&interval=1d&period1={timestampStart}&period2={timestampEnd}`
+`https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?formatted=true&includeAdjustedClose=true&events=split&interval=1d&period1={timestampStart}&period2={timestampEnd}`
 
 - `symbol`：ticker（例如 `VTI`, `NVDA`）
   - **注意（Class shares）**：若 ticker 含 `.`（例如 `BRK.B`），打 Yahoo API 時需轉成 `-`（`BRK-B`）才會成功；系統內事件/持倉 ticker 可維持原樣，僅在「送 Yahoo request」時做 normalize。
@@ -146,10 +147,13 @@
 
 - **預設**：使用 `close` 作為收盤價。
 - **回退**：若 `close` 不存在或為 `null`，可回退 `adjclose`（是否回退需在第 10 節定義為決策）。
+- **拆股事件**：使用 `events.splits`（可選欄位；若區間內無拆股，可能沒有 `events` 或 `events.splits`）。
 
 ### 5.3 價格表結構（供 O(1) 查詢）
 
 - 建立 `PriceSeries`：`Map<isoDate, closePrice>`
+- 建立 `SplitEvents`：`{ isoDateET, factor, date, splitRatio }[]`
+  - `factor = numerator / denominator`（例：`4:1 => 4`，`10:1 => 10`）。
 - 快取粒度：`(symbol, [startYear,endYear])`（每個 ticker 一筆）
 - 目標：
   - **每個 ticker 每次計算最多一次 Yahoo request**（單一區間，不再逐年切多次 request）。
@@ -193,9 +197,23 @@ export type Holdings = Map<string, number>; // ticker -> shares
 
 - 蒐集所有需要的 ticker：`uniqueTickers = unique(events.ticker) ∪ {"VTI"}`
 - 依年度/區間取得各 ticker 的 `PriceSeries`。
+- 依同區間取得各 ticker 的 `SplitEvents`。
 - 需要一個取價函式：
   - `getClose(ticker, isoDate) -> number`
   - 若該日缺價：依回退規則（例如取「最近前一個有價交易日」），見第 10 節。
+
+### 7.2.1 拆股還原（BUY 股數正規化）
+
+- 對每一筆 BUY 事件 `e`（`ticker, isoDateET, shares`）：
+  1. 取該 ticker 所有 `SplitEvents`。
+  2. 僅套用 `split.isoDateET > e.isoDateET` 的事件（嚴格大於；同日不套用）。
+  3. 累乘倍率 `F = Π split.factor`。
+  4. 還原後股數：`shares' = shares * F`。
+- SELL 在本版 BUY-only 模式不納入計算，無需套用拆股還原。
+- 對帳用 debug 欄位可附加：
+  - `splitAdjustedFromShares`（原始股數）
+  - `splitFactorApplied`（累積倍率）
+  - `splitAppliedChain`（例如 `2021-07-20 x4 -> 2024-06-10 x10`）
 
 ### 7.3 holdings 更新與市值計算
 
@@ -311,7 +329,7 @@ export type Holdings = Map<string, number>; // ticker -> shares
 - **資料快取（避免重抓）**：
   - 除了 stage 狀態（`chrome.storage.local` / `sessionStorage`）外，另以 **IndexedDB** 持久化：
     - `buyEvents`：`{startYear, endYear, events}`
-    - `priceSeries`：`{ticker, startYear, endYear, close[], adjclose[]}`
+    - `priceSeries`：`{ticker, startYear, endYear, close[], adjclose[], splits[]}`
   - 設計目的：同一登入情境下，歷史資料（過去交易與歷史收盤價）優先讀快取，降低重複爬蟲與重複 API 請求。
 - **建議 stage（參考）**：
   - `buy_submitted`：已設定買入日期區間並 submit，等待 reload 後解析買入 table
@@ -369,6 +387,10 @@ export type Holdings = Map<string, number>; // ticker -> shares
    - **預設**：避免依賴瀏覽器對日期字串的 parse；建議用 `xAxis.type = "time"`，series 使用 `[timestampMs, value]` pair：`[[tsMs, v], ...]`。  
    - **理由**：跨瀏覽器/locale 的日期 parse 風險最低，且對 extension 這類環境最穩；測試也更容易做精準比對。
 
+9. **拆股事件套用邊界（同日規則）**  
+   - **預設**：只套用 `split.isoDateET > trade.isoDateET`，不套用同日（`==`）拆股。  
+   - **理由**：同日內交易發生時點與拆股生效時點在來源資料中通常不可得，採嚴格大於可避免同日誤套。
+
 ---
 
 ## 11) 驗收準則（Acceptance Criteria）
@@ -382,4 +404,9 @@ export type Holdings = Map<string, number>; // ticker -> shares
 5. **快取行為**：
    - 首次執行（無快取）會進行爬蟲與 Yahoo 抓價，並寫入 IndexedDB。
    - 後續同區間執行應命中快取：不重跑年度爬蟲，且對已覆蓋區間的 ticker 不重打 Yahoo API。
+6. **拆股還原一致性**：
+   - 給定 split fixture（例如 NVDA `2021-07-20 x4`、`2024-06-10 x10`）：
+     - `2021-07-20` 前買入事件應套用 `x40`
+     - `2021-07-20` 到 `2024-06-10` 間買入事件應套用 `x10`
+     - `2024-06-10` 後買入事件應套用 `x1`
 

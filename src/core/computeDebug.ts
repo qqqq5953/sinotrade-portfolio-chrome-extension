@@ -14,6 +14,9 @@ export interface DebugEventUsed {
   type: TradeType;
   ticker: string;
   shares: number;
+  splitAdjustedFromShares?: number;
+  splitFactorApplied?: number;
+  splitAppliedChain?: string[];
   cash: number;
   isoDateET: string;
   resolvedIsoDateET: string;
@@ -90,6 +93,15 @@ export function computePortfolioVsVtiSeriesWithDebug(inputs: ComputeWithDebugInp
           type: et.event.type,
           ticker: et.event.ticker,
           shares: et.event.shares,
+          ...(et.event.splitAdjustedFromShares != null
+            ? { splitAdjustedFromShares: et.event.splitAdjustedFromShares }
+            : {}),
+          ...(et.event.splitFactorApplied != null
+            ? { splitFactorApplied: et.event.splitFactorApplied }
+            : {}),
+          ...(Array.isArray(et.event.splitAppliedChain) && et.event.splitAppliedChain.length > 0
+            ? { splitAppliedChain: et.event.splitAppliedChain }
+            : {}),
           cash: et.event.cash,
           isoDateET: et.event.isoDateET,
           resolvedIsoDateET: et.resolvedIsoDateET,

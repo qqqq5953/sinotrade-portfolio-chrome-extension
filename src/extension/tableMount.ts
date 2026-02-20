@@ -239,6 +239,23 @@ function eventSummary(row: DebugDayRow): string {
     .join('\n');
 }
 
+function splitAdjSummary(row: DebugDayRow): string {
+  const lines = row.events
+    .map((e) => {
+      const factor = e.splitFactorApplied;
+      const raw = e.splitAdjustedFromShares;
+      if (typeof factor !== 'number' || !Number.isFinite(factor) || factor === 1) return '';
+      if (typeof raw !== 'number' || !Number.isFinite(raw)) return '';
+      const chain =
+        Array.isArray(e.splitAppliedChain) && e.splitAppliedChain.length > 0
+          ? ` [${e.splitAppliedChain.join(' -> ')}]`
+          : '';
+      return `${e.ticker} raw=${fmt(raw)} × ${fmt(factor)} => ${fmt(e.shares)}${chain}`;
+    })
+    .filter((x) => x.length > 0);
+  return lines.length > 0 ? lines.join('\n') : '(none)';
+}
+
 function holdingsSummary(row: DebugDayRow): string {
   if (row.holdingsAfter.length === 0) return '(empty)';
   return row.holdingsAfter.map((h) => `${h.ticker}:${fmt(h.shares)}`).join(', ');
@@ -333,6 +350,7 @@ export function renderDebugTable(
             <th>resolved</th>
             <th>anchorShifted</th>
             <th>events</th>
+            <th>splitAdj</th>
             <th>dayCashTotal</th>
             <th>vtiΔTotal</th>
             <th>holdingsAfter</th>
@@ -369,6 +387,7 @@ export function renderDebugTable(
                   <td class="mono">${r.resolvedIsoDateET}</td>
                   <td>${r.anchorShifted ? '<span class="tag">shifted</span>' : ''}</td>
                   <td class="mono">${eventSummary(r)}</td>
+                  <td class="mono">${splitAdjSummary(r)}</td>
                   <td class="mono">${fmt(r.dayCashTotal)}</td>
                   <td class="mono">${fmt(r.vtiDeltaSharesTotal)}</td>
                   <td class="mono">${holdingsSummary(r)}</td>
