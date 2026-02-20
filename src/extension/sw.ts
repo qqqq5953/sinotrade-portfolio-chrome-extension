@@ -1,15 +1,12 @@
+import type { YahooChartResponse } from "../core/yahoo";
+import type { YahooFetchResp, YahooProxyError } from "./yahooProxyTypes";
+
 declare const chrome: any;
 
 type YahooFetchMsg = { type: 'YAHOO_FETCH_JSON'; url: string };
-type YahooProxyError = {
-  kind: 'http' | 'network' | 'unknown';
-  url: string;
-  message: string;
-  status?: number;
-};
-type YahooFetchResp = { ok: true; json: unknown } | { ok: false; error: YahooProxyError };
 
-async function fetchJson(url: string): Promise<unknown> {
+
+async function fetchJson(url: string): Promise<YahooChartResponse> {
   try {
     const res = await fetch(url);
     if (!res.ok) {

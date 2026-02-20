@@ -1,6 +1,7 @@
 import {
   computePortfolioVsVtiSeriesWithDebug,
   parseYahooChartToPriceSeriesPair,
+  type YahooChartResponse,
   type PriceSeries,
   type TradeEvent
 } from '../core';
@@ -32,6 +33,7 @@ import {
 } from './idb';
 import { clearRunState, loadRunState, saveRunState } from './state';
 import { getStopEventName, setStatus, setStatusDone, setStatusError } from './status';
+import type { YahooFetchResp, YahooProxyError } from './yahooProxyTypes';
 
 // BUY-only mode: compare incremental BUY cashflow performance
 // from the site's earliest allowed date (daterangepicker.minDate) to today.
@@ -57,13 +59,6 @@ let priceMode: PriceMode = 'close'; // default per user request
 let valueMode: ValueMode = 'excess';
 let cachedComputed: ReturnType<typeof computePortfolioVsVtiSeriesWithDebug> | null = null;
 
-type YahooProxyError = {
-  kind: 'http' | 'network' | 'unknown';
-  url: string;
-  message: string;
-  status?: number;
-};
-type YahooFetchResp = { ok: true; json: unknown } | { ok: false; error: YahooProxyError };
 
 type PriceFetchAttemptLog = {
   ticker: string;
@@ -106,7 +101,7 @@ function getMinDateYearFromPage(inputId: string): number {
     }
 }
 
-async function fetchYahooJsonViaSw(url: string): Promise<{ ok: true; json: unknown } | { ok: false; error: YahooProxyError }> {
+async function fetchYahooJsonViaSw(url: string): Promise<YahooFetchResp> {
   if (typeof chrome === 'undefined' || !chrome?.runtime?.sendMessage) {
     return {
       ok: false,
@@ -161,7 +156,7 @@ async function fetchYahooJsonWithRetry(
   args: { ticker: string; year: number; endYear?: number; url: string },
   report: PriceFetchReport,
   opts?: { maxRetries?: number }
-): Promise<{ ok: true; json: unknown } | { ok: false; error: YahooProxyError }> {
+): Promise<YahooFetchResp> {
   const maxRetries = opts?.maxRetries ?? 3; // total attempts = 1 + maxRetries
   const maxAttempts = 1 + maxRetries;
   const yearLabel = args.endYear != null ? `${args.year}-${args.endYear}` : String(args.year);

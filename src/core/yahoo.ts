@@ -14,6 +14,40 @@ export interface YahooParseOptions {
   preferAdjClose: boolean; // default true
 }
 
+export interface YahooChartSplit {
+  date: number;
+  numerator: number;
+  denominator: number;
+  splitRatio: string;
+}
+
+export interface YahooChartResult {
+  meta?: Record<string, unknown>;
+  timestamp?: number[];
+  events?: {
+    splits?: Record<string, YahooChartSplit>;
+  };
+  indicators?: {
+    quote?: Array<{
+      close?: number[];
+      volume?: number[];
+      high?: number[];
+      open?: number[];
+      low?: number[];
+    }>;
+    adjclose?: Array<{
+      adjclose?: number[];
+    }>;
+  };
+}
+
+export interface YahooChartResponse {
+  chart: {
+    result: YahooChartResult[] | null;
+    error: { code: string; description: string } | null;
+  };
+}
+
 const DEFAULT_PARSE_OPTS: YahooParseOptions = {
   preferAdjClose: true
 };
@@ -34,7 +68,7 @@ export async function fetchYahooPriceSeries(
   symbol: string,
   range: YahooFetchRange,
   signal?: AbortSignal
-): Promise<unknown> {
+): Promise<YahooChartResponse> {
   const period1 = isoDateToUtcSeconds(range.startIsoDateUtc);
   // period2 is inclusive-ish; caller can pass end+1 for buffer
   const period2 = isoDateToUtcSeconds(range.endIsoDateUtc);
@@ -47,12 +81,12 @@ export async function fetchYahooPriceSeries(
     console.log('===not ok===', { symbol, status: res.status, url });
     throw specError('YAHOO_HTTP', `Yahoo HTTP ${res.status}`, { symbol, status: res.status, url });
   }
-  return (await res.json()) as unknown;
+  return (await res.json()) as YahooChartResponse;
 }
 
 export function parseYahooChartToPriceSeries(
   symbol: string,
-  yahooJson: any,
+  yahooJson: YahooChartResponse,
   opts: YahooParseOptions = DEFAULT_PARSE_OPTS
 ): PriceSeries {
   const chartErr = yahooJson?.chart?.error;
@@ -65,9 +99,9 @@ export function parseYahooChartToPriceSeries(
     throw specError('YAHOO_PARSE', 'Missing chart.result[0]', { symbol });
   }
 
-  const timestamps: unknown[] | undefined = result.timestamp;
-  const closes: (number | null)[] | undefined = result?.indicators?.quote?.[0]?.close;
-  const adjcloses: (number | null)[] | undefined = result?.indicators?.adjclose?.[0]?.adjclose;
+  const timestamps: number[] | undefined = result.timestamp;
+  const closes: number[] | undefined = result?.indicators?.quote?.[0]?.close;
+  const adjcloses: number[] | undefined = result?.indicators?.adjclose?.[0]?.adjclose;
 
   if (!Array.isArray(timestamps) || !Array.isArray(closes)) {
     throw specError('YAHOO_PARSE', 'Invalid timestamp/close arrays', { symbol });
@@ -104,7 +138,7 @@ export interface YahooPriceSeriesPair {
  *
  * This is useful for fast switching between valuation bases without refetching.
  */
-export function parseYahooChartToPriceSeriesPair(symbol: string, yahooJson: any): YahooPriceSeriesPair {
+export function parseYahooChartToPriceSeriesPair(symbol: string, yahooJson: YahooChartResponse): YahooPriceSeriesPair {
   const chartErr = yahooJson?.chart?.error;
   if (chartErr) {
     console.log('===parseYahooChartToPriceSeriesPair chartErr===', { symbol, chartError: chartErr });
@@ -115,9 +149,9 @@ export function parseYahooChartToPriceSeriesPair(symbol: string, yahooJson: any)
     throw specError('YAHOO_PARSE', 'Missing chart.result[0]', { symbol });
   }
 
-  const timestamps: unknown[] | undefined = result.timestamp;
-  const closes: (number | null)[] | undefined = result?.indicators?.quote?.[0]?.close;
-  const adjcloses: (number | null)[] | undefined = result?.indicators?.adjclose?.[0]?.adjclose;
+  const timestamps: number[] | undefined = result.timestamp;
+  const closes: number[] | undefined = result?.indicators?.quote?.[0]?.close;
+  const adjcloses: number[] | undefined = result?.indicators?.adjclose?.[0]?.adjclose;
 
   if (!Array.isArray(timestamps) || !Array.isArray(closes)) {
     throw specError('YAHOO_PARSE', 'Invalid timestamp/close arrays', { symbol });
