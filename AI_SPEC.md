@@ -44,6 +44,10 @@
 - **年度範圍**：
   - 由頁面 daterangepicker 的 `minDate` 決定最早可查日期（例如 `2021/01/01`）
   - Extension 會讀取 `minDate` 並以其年份作為抓取起點（`startYear = minDate.year`），逐年查詢到今年
+- **快取優先（IndexedDB）**：
+  - 啟動流程時先檢查本機快取的買入事件（`startYear/endYear/events`）。
+  - 若快取區間與當前頁面區間一致（`cached.startYear == startYear && cached.endYear == endYear`），**直接使用快取事件進入計算**，不重跑年度爬蟲。
+  - 若快取不存在或區間不一致，才執行逐年查詢與解析；完成後回寫快取。
 - **每個年度的日期輸入**：
   - 起始：`YYYY/01/01`
   - 結束：
@@ -129,8 +133,8 @@
 - `symbol`：ticker（例如 `VTI`, `NVDA`）
   - **注意（Class shares）**：若 ticker 含 `.`（例如 `BRK.B`），打 Yahoo API 時需轉成 `-`（`BRK-B`）才會成功；系統內事件/持倉 ticker 可維持原樣，僅在「送 Yahoo request」時做 normalize。
 - `period1/period2`：Unix timestamp（**秒**）邊界，例如：1626652800，建議：
-  - `period1`：年度起始日 00:00:00 UTC 的 timestamp（或以交易所時區計算；見第 10 節）
-  - `period2`：建議用「**隔日 00:00:00 UTC**」作為右邊界（例如年度用 `YYYY+1-01-01`；今年用 `today+1` buffer），避免 API 邊界行為導致漏掉最後一天（見 10.7）。
+  - `period1`：該 ticker 需求區間起點（通常為該 ticker 最早買入年 `startYear-01-01`）00:00:00 UTC 的 timestamp
+  - `period2`：需求區間終點右邊界（若終點為今年則 `today+1`；否則 `endYear+1-01-01`），避免 API 邊界行為導致漏掉最後一天（見 10.7）。
 
 ### 5.4 CORS 與 Extension 架構注意事項（重要）
 
@@ -146,8 +150,11 @@
 ### 5.3 價格表結構（供 O(1) 查詢）
 
 - 建立 `PriceSeries`：`Map<isoDate, closePrice>`
-- 快取粒度：`(symbol, year)` 或 `(symbol, [start,end])`
-- 目標：同一 symbol 同一年度只打一次網路請求（除非失敗重試）。
+- 快取粒度：`(symbol, [startYear,endYear])`（每個 ticker 一筆）
+- 目標：
+  - **每個 ticker 每次計算最多一次 Yahoo request**（單一區間，不再逐年切多次 request）。
+  - 若本機快取已覆蓋需求區間（`cached.startYear <= needed.startYear && cached.endYear >= needed.endYear`），直接使用快取，不打 Yahoo API。
+  - 僅在快取缺失或覆蓋不足時才打 Yahoo，成功後更新該 ticker 快取。
 
 ---
 
@@ -301,6 +308,11 @@ export type Holdings = Map<string, number>; // ticker -> shares
 
 - **觸發條件**：每次呼叫 `SubmitForm()/form.submit()` 可能整頁 reload；切換到賣出 tab 也可能 reload。
 - **策略**：將抓取流程拆成多個 stage，並在每次「可能 reload」的動作前先持久化狀態，reload 後自動恢復並繼續下一步。
+- **資料快取（避免重抓）**：
+  - 除了 stage 狀態（`chrome.storage.local` / `sessionStorage`）外，另以 **IndexedDB** 持久化：
+    - `buyEvents`：`{startYear, endYear, events}`
+    - `priceSeries`：`{ticker, startYear, endYear, close[], adjclose[]}`
+  - 設計目的：同一登入情境下，歷史資料（過去交易與歷史收盤價）優先讀快取，降低重複爬蟲與重複 API 請求。
 - **建議 stage（參考）**：
   - `buy_submitted`：已設定買入日期區間並 submit，等待 reload 後解析買入 table
   - `need_sell_tab`：買入完成，準備切換賣出 tab（可能 reload）
@@ -367,4 +379,7 @@ export type Holdings = Map<string, number>; // ticker -> shares
    - 指定 3–5 個日期點的 portfolio/vti value 精準相等（允許小數誤差需定義 epsilon）。
 3. **跨年度**：至少一組 fixture 覆蓋 12/31 與 01/02（或 01/03）後，序列仍能正確串接不重複/不遺漏。
 4. **容錯**：遇到某年度無交易時不崩潰；遇到單筆列解析失敗有 warning 且可繼續產圖（若採跳過策略）。
+5. **快取行為**：
+   - 首次執行（無快取）會進行爬蟲與 Yahoo 抓價，並寫入 IndexedDB。
+   - 後續同區間執行應命中快取：不重跑年度爬蟲，且對已覆蓋區間的 ticker 不重打 Yahoo API。
 
