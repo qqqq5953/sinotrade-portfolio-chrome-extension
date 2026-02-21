@@ -5,6 +5,10 @@ const TABLE_ID = 'pvs-debug-table';
 const TOGGLE_ID = 'pvs-price-toggle';
 const FETCH_ID = 'pvs-fetch-report';
 const RULES_ID = 'pvs-chart-rules';
+/** Wrapper for all extension UI under #TagSelectArea (flex column, gap). */
+export const WRAPPER_ID = 'pvs-chart-block';
+
+const BLOCK_ORDER = [FETCH_ID, RULES_ID, TOGGLE_ID, 'chart', TABLE_ID] as const;
 
 export type PriceMode = 'close' | 'adjclose';
 // Value mode controls chart display (privacy) only.
@@ -16,7 +20,6 @@ function ensureStyle(): void {
   style.id = STYLE_ID;
   style.textContent = `
 #${TABLE_ID} {
-  margin-top: 12px;
   border: 1px solid #e5e7eb;
   border-radius: 12px;
   overflow: hidden;
@@ -75,15 +78,15 @@ function ensureStyle(): void {
   background: #fff;
 }
 #${TOGGLE_ID} {
-  display: block;
-  margin: 10px 0 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 #${TOGGLE_ID} .row {
   display: flex;
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
-  margin: 6px 0;
 }
 #${TOGGLE_ID} .btn {
   border: 1px solid #e5e7eb;
@@ -107,14 +110,51 @@ function ensureStyle(): void {
   font-size: 12px;
   color: #6b7280;
 }
+#${TABLE_ID} details.summary-card,
+#${FETCH_ID} details.summary-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #fff;
+}
+#${TABLE_ID} details.summary-card > summary,
+#${FETCH_ID} details.summary-card > summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: #111827;
+  font-weight: 700;
+}
+#${TABLE_ID} details.summary-card > summary::-webkit-details-marker,
+#${FETCH_ID} details.summary-card > summary::-webkit-details-marker {
+  display: none;
+}
+#${TABLE_ID} .summary-hint,
+#${FETCH_ID} .summary-hint {
+  font-size: 12px;
+  color: #6b7280;
+  font-weight: 400;
+}
+#${TABLE_ID} .summary-body,
+#${FETCH_ID} .summary-body {
+  border-top: 1px solid #f3f4f6;
+}
 #${RULES_ID} {
-  margin: 8px 0 10px 0;
   border: 1px solid #e5e7eb;
   border-radius: 10px;
   background: #fff;
   padding: 8px 10px;
   color: #374151;
   font-size: 12px;
+}
+#${RULES_ID} .rules-title {
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 6px 0;
+  font-size: 13px;
 }
 #${RULES_ID} ul {
   margin: 0;
@@ -123,84 +163,71 @@ function ensureStyle(): void {
 #${RULES_ID} li + li {
   margin-top: 2px;
 }
+#${WRAPPER_ID} {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
 `;
   document.head.appendChild(style);
 }
 
+function ensurePvsWrapper(): HTMLDivElement {
+  const tagArea = document.getElementById('TagSelectArea') as HTMLElement | null;
+  let wrapper = document.getElementById(WRAPPER_ID) as HTMLDivElement | null;
+  if (wrapper) {
+    orderWrapperChildren(wrapper);
+    return wrapper;
+  }
+  if (!tagArea) throw new Error('TagSelectArea not found');
+  wrapper = document.createElement('div');
+  wrapper.id = WRAPPER_ID;
+  const children = Array.from(tagArea.children);
+  const insertBefore = children[1] ?? null;
+  if (insertBefore) tagArea.insertBefore(wrapper, insertBefore);
+  else tagArea.appendChild(wrapper);
+  for (const id of BLOCK_ORDER) {
+    const el = document.getElementById(id);
+    if (el && el.parentElement === tagArea) wrapper.appendChild(el);
+  }
+  return wrapper;
+}
+
+function orderWrapperChildren(wrapper: HTMLElement): void {
+  for (const id of BLOCK_ORDER) {
+    const el = document.getElementById(id);
+    if (el && el.parentElement === wrapper) wrapper.appendChild(el);
+  }
+}
+
 function ensureContainerAfterChart(): HTMLDivElement {
   ensureStyle();
+  const wrapper = ensurePvsWrapper();
   const existing = document.getElementById(TABLE_ID) as HTMLDivElement | null;
-  const chart = document.getElementById('chart') as HTMLDivElement | null;
-  const tagArea = document.getElementById('TagSelectArea') as HTMLElement | null;
   if (existing) {
-    // If chart exists, ensure the table is placed right after chart.
-    if (chart && existing.parentElement) {
-      const parent = chart.parentElement;
-      if (parent && existing !== chart.nextSibling) {
-        if (chart.nextSibling) parent.insertBefore(existing, chart.nextSibling);
-        else parent.appendChild(existing);
-      }
-    }
+    if (existing.parentElement !== wrapper) wrapper.appendChild(existing);
+    orderWrapperChildren(wrapper);
     return existing;
   }
-
-  // If chart isn't mounted yet, attach to TagSelectArea as a placeholder;
-  // later calls will reposition it after chart.
-  if (!chart) {
-    const host = tagArea ?? document.body;
-    const div = document.createElement('div');
-    div.id = TABLE_ID;
-    host.appendChild(div);
-    return div;
-  }
-
-  const parent = chart.parentElement;
-  if (!parent) throw new Error('Chart has no parent element');
-
   const div = document.createElement('div');
   div.id = TABLE_ID;
-
-  // Insert as sibling element right after chart.
-  if (chart.nextSibling) parent.insertBefore(div, chart.nextSibling);
-  else parent.appendChild(div);
-
+  wrapper.appendChild(div);
   return div;
 }
 
 function ensureToggleBeforeChart(): HTMLDivElement {
   ensureStyle();
+  const wrapper = ensurePvsWrapper();
   const existing = document.getElementById(TOGGLE_ID) as HTMLDivElement | null;
-  const chart = document.getElementById('chart') as HTMLDivElement | null;
-  const tagArea = document.getElementById('TagSelectArea') as HTMLElement | null;
-
-  // If already exists, ensure it is placed before chart when chart is available.
   if (existing) {
-    if (chart && existing.parentElement) {
-      const parent = chart.parentElement;
-      if (parent && existing.nextSibling !== chart) {
-        parent.insertBefore(existing, chart);
-      }
-    }
+    if (existing.parentElement !== wrapper) wrapper.appendChild(existing);
+    orderWrapperChildren(wrapper);
     return existing;
   }
-
-  // If chart isn't mounted yet, attach to TagSelectArea as a placeholder;
-  // later calls will reposition it before chart.
-  if (!chart) {
-    const host = tagArea ?? document.body;
-    const div = document.createElement('div');
-    div.id = TOGGLE_ID;
-    // Prefer inserting near the top for visibility.
-    if (host.firstChild) host.insertBefore(div, host.firstChild);
-    else host.appendChild(div);
-    return div;
-  }
-
-  const parent = chart.parentElement;
-  if (!parent) throw new Error('Chart has no parent element');
   const div = document.createElement('div');
   div.id = TOGGLE_ID;
-  parent.insertBefore(div, chart);
+  wrapper.appendChild(div);
+  orderWrapperChildren(wrapper);
   return div;
 }
 
@@ -231,61 +258,33 @@ function ensureToggleRows(): { root: HTMLDivElement; valueRow: HTMLDivElement; p
 
 function ensureFetchReportAfterToggle(): HTMLDivElement {
   ensureStyle();
+  const wrapper = ensurePvsWrapper();
   const existing = document.getElementById(FETCH_ID) as HTMLDivElement | null;
-  const toggle = document.getElementById(TOGGLE_ID) as HTMLDivElement | null;
-  const chart = document.getElementById('chart') as HTMLDivElement | null;
-  const tagArea = document.getElementById('TagSelectArea') as HTMLElement | null;
-
   if (existing) {
-    if (toggle && toggle.parentElement && existing.parentElement && existing.nextSibling !== toggle) {
-      toggle.parentElement.insertBefore(existing, toggle);
-    } else if (tagArea && existing.parentElement === tagArea && tagArea.firstChild !== existing) {
-      tagArea.insertBefore(existing, tagArea.firstChild);
-    }
+    if (existing.parentElement !== wrapper) wrapper.appendChild(existing);
+    orderWrapperChildren(wrapper);
     return existing;
   }
-
-  const host = (toggle?.parentElement ?? tagArea ?? chart?.parentElement ?? document.body) as HTMLElement;
   const div = document.createElement('div');
   div.id = FETCH_ID;
-  div.style.margin = '0 0 8px 0';
-  if (toggle && toggle.parentElement) toggle.parentElement.insertBefore(div, toggle);
-  else if (host.firstChild) host.insertBefore(div, host.firstChild);
-  else host.appendChild(div);
+  wrapper.appendChild(div);
+  orderWrapperChildren(wrapper);
   return div;
 }
 
 function ensureRulesBetweenToggleAndChart(): HTMLDivElement {
   ensureStyle();
+  const wrapper = ensurePvsWrapper();
   const existing = document.getElementById(RULES_ID) as HTMLDivElement | null;
-  const toggle = document.getElementById(TOGGLE_ID) as HTMLDivElement | null;
-  const chart = document.getElementById('chart') as HTMLDivElement | null;
-  const tagArea = document.getElementById('TagSelectArea') as HTMLElement | null;
-  const host = (toggle?.parentElement ?? chart?.parentElement ?? tagArea ?? document.body) as HTMLElement;
-
   if (existing) {
-    if (toggle && toggle.parentElement) {
-      const anchor = toggle.nextSibling;
-      if (anchor !== existing) {
-        if (anchor) toggle.parentElement.insertBefore(existing, anchor);
-        else toggle.parentElement.appendChild(existing);
-      }
-    } else if (chart && chart.parentElement && existing.nextSibling !== chart) {
-      chart.parentElement.insertBefore(existing, chart);
-    }
+    if (existing.parentElement !== wrapper) wrapper.appendChild(existing);
+    orderWrapperChildren(wrapper);
     return existing;
   }
-
   const div = document.createElement('div');
   div.id = RULES_ID;
-  if (toggle && toggle.parentElement) {
-    if (toggle.nextSibling) toggle.parentElement.insertBefore(div, toggle.nextSibling);
-    else toggle.parentElement.appendChild(div);
-  } else if (chart && chart.parentElement) {
-    chart.parentElement.insertBefore(div, chart);
-  } else {
-    host.appendChild(div);
-  }
+  wrapper.appendChild(div);
+  orderWrapperChildren(wrapper);
   return div;
 }
 
@@ -296,7 +295,14 @@ function fmt(n: number): string {
 
 function eventSummary(row: DebugDayRow): string {
   return row.events
-    .map((e) => `${e.type} ${e.ticker} shares=${fmt(e.shares)} cash=${fmt(e.cash)} vtiΔ=${fmt(e.vtiDeltaShares)}`)
+    .map((e) =>
+      [
+        `${e.type} ${e.ticker}`,
+        `•\u00A0shares=${fmt(e.shares)}`,
+        `•\u00A0cash=${fmt(e.cash)}`,
+        `•\u00A0vtiΔ=${fmt(e.vtiDeltaShares)}`
+      ].join('\n')
+    )
     .join('\n');
 }
 
@@ -333,7 +339,7 @@ export function renderPriceModeToggle(mode: PriceMode, onChange: (mode: PriceMod
   priceRow.innerHTML = `
     <button class="btn ${mode === 'close' ? 'active' : ''}" data-mode="close" type="button">Close</button>
     <button class="btn ${mode === 'adjclose' ? 'active' : ''}" data-mode="adjclose" type="button">Adj Close</button>
-    <span class="hint">估值口徑（不會重抓資料，僅重算/更新圖表與表格）</span>
+    <span class="hint">市值計算口徑（不會重抓資料，僅重算/更新圖表與表格）</span>
   `;
   priceRow.querySelectorAll<HTMLButtonElement>('button[data-mode]').forEach((b) => {
     b.onclick = () => {
@@ -371,6 +377,8 @@ export function renderValueModeToggle(mode: ValueMode, onChange: (mode: ValueMod
   }
 }
 
+const RULES_TITLE = '圖表呈現規則';
+
 export function renderChartRules(): void {
   const div = ensureRulesBetweenToggleAndChart();
   const items = [
@@ -378,7 +386,7 @@ export function renderChartRules(): void {
     '拆股還原規則：僅套用 splitDate > tradeDate（同日不套用）',
     '若價格有回補，會標示使用的實際日期'
   ];
-  div.innerHTML = `<ul>${items.map((x) => `<li>${x}</li>`).join('')}</ul>`;
+  div.innerHTML = `<div class="rules-title">${RULES_TITLE}</div><ul>${items.map((x) => `<li>${x}</li>`).join('')}</ul>`;
 }
 
 export function renderDebugTable(
@@ -407,57 +415,70 @@ export function renderDebugTable(
   const div = ensureContainerAfterChart();
   const anchorTicker = opts.anchorTicker ?? 'VTI';
   const modeLabel = opts.mode === 'close' ? 'Close' : 'Adj Close';
-  const noteTitle = '顯示運算所用資料（事件、日期校正、取價與回補、持倉與估值）'
+  const summaryHint = '顯示運算所用資料'
   const noteItems = [
-    `目前估值口徑：${modeLabel}`,
+    `目前市值計算口徑：${modeLabel}`,
     '比較規則：BUY-only（SELL 不納入比較）',
     '拆股還原規則：僅套用 splitDate > tradeDate（同日不套用）',
     '若價格有回補，會標示使用的實際日期',
   ];
 
   const html = `
-    <div class="hdr">資料檢查表（Debug）</div>
-    <div class="subhdr">
-      <div class="hint">${noteTitle}</div>
-      <ul>${noteItems.map((x) => `<li>${x}</li>`).join('')}</ul>
-    </div>
-    <div style="overflow:auto; max-height: 520px;">
-      <table>
-        <thead>
-          <tr>
-            <th>dayKey</th>
-            <th>resolved</th>
-            <th>anchorShifted</th>
-            <th>events</th>
-            <th>splitAdj</th>
-            <th>dayCashTotal</th>
-            <th>vtiΔTotal</th>
-            <th>holdingsAfter</th>
-            <th>pricesUsed (close / adj)</th>
-            <th>${anchorTicker} price (close / adj)</th>
-            <th>portfolioValue</th>
-            <th>vtiShares</th>
-            <th>vtiValue</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${rows
-            .map((r) => {
+    <details class="summary-card">
+      <summary>
+        <span>進階資料檢查（Debug）</span>
+        <span class="summary-hint">${summaryHint}</span>
+      </summary>
+      <div class="summary-body">
+        <div class="subhdr">
+          <ul>${noteItems.map((x) => `<li>${x}</li>`).join('')}</ul>
+        </div>
+        <div style="overflow:auto; max-height: 520px;">
+          <table>
+            <thead>
+              <tr>
+                <th>事件日期</th>
+                <th>實際計算日期</th>
+                <th>日期校正</th>
+                <th>當日事件</th>
+                <th>拆股還原</th>
+                <th>當日現金流</th>
+                <th>${anchorTicker} 股數變化</th>
+                <th>持倉（事件後）</th>
+                <th>標的價格（收盤 & 還原）</th>
+                <th>${anchorTicker} 價格（收盤 & 還原）</th>
+                <th>投資組合市值</th>
+                <th>${anchorTicker} 持有股數</th>
+                <th>${anchorTicker} 市值</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows
+                .map((r) => {
               const usedVtiIso = r.vtiPriceUsed.usedIsoDateET;
               const vtiClose = lookup(opts.closeSeriesByTicker.get(anchorTicker), usedVtiIso);
               const vtiAdj = lookup(opts.adjSeriesByTicker.get(anchorTicker), usedVtiIso);
-              const vtiPrice = `close=${vtiClose == null ? '—' : fmt(vtiClose)} / adj=${vtiAdj == null ? '—' : fmt(vtiAdj)}${
-                r.vtiPriceUsed.backfilled ? ` (←${usedVtiIso})` : ''
-              }`;
+              const vtiPrice = [
+                `•\u00A0close=${vtiClose == null ? '—' : fmt(vtiClose)}`,
+                `•\u00A0adj=${vtiAdj == null ? '—' : fmt(vtiAdj)}`,
+                r.vtiPriceUsed.backfilled ? `•\u00A0回補日期：${usedVtiIso}` : ''
+              ]
+                .filter((x) => x.length > 0)
+                .join('\n');
 
               const priceLines = r.portfolioPricesUsed
                 .map((p) => {
                   const iso = p.usedIsoDateET;
                   const c = lookup(opts.closeSeriesByTicker.get(p.ticker), iso);
                   const a = lookup(opts.adjSeriesByTicker.get(p.ticker), iso);
-                  return `${p.ticker} close=${c == null ? '—' : fmt(c)} / adj=${a == null ? '—' : fmt(a)}${
-                    p.backfilled ? ` (←${iso})` : ''
-                  }`;
+                  return [
+                    `${p.ticker}`,
+                    `•\u00A0close=${c == null ? '—' : fmt(c)}`,
+                    `•\u00A0adj=${a == null ? '—' : fmt(a)}`,
+                    p.backfilled ? `•\u00A0回補日期：${iso}` : ''
+                  ]
+                    .filter((x) => x.length > 0)
+                    .join('\n');
                 })
                 .join('\n');
               return `
@@ -479,9 +500,11 @@ export function renderDebugTable(
               `;
             })
             .join('')}
-        </tbody>
-      </table>
-    </div>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </details>
   `;
 
   div.innerHTML = html;
@@ -504,9 +527,10 @@ export function renderPriceFetchReport(report: {
   const div = ensureFetchReportAfterToggle();
   const durMs = report.finishedAt ? report.finishedAt - report.startedAt : null;
   const failed = report.failedTickers ?? [];
-  const headline = `抓價報告：${failed.length === 0 ? '全部成功' : `失敗 ${failed.length} 檔`}${
+  const headline = `${failed.length === 0 ? '資料同步完成' : '資料同步完成（部分項目需留意）'}${
     durMs == null ? '' : `（${(durMs / 1000).toFixed(1)}s）`
   }`;
+  const summaryHint = failed.length === 0 ? '本次未偵測到異常。查看詳情' : `其中 ${failed.length} 檔抓價異常。查看詳情`;
 
   const failedLines =
     failed.length === 0 ? '' : failed.map((f) => `- ${f.ticker}: ${f.reason}`).join('\n');
@@ -527,18 +551,23 @@ export function renderPriceFetchReport(report: {
           .join('\n');
 
   div.innerHTML = `
-    <div style="border:1px solid #e5e7eb; border-radius:12px; padding:10px 12px; background:#fff;">
-      <div style="font-weight:700; color:#111827; margin-bottom:6px;">${headline}</div>
-      ${
-        failedLines
-          ? `<div class="mono" style="white-space:pre-wrap; color:#991b1b; margin-bottom:6px;">${failedLines}</div>`
-          : `<div style="color:#374151; font-size:12px; margin-bottom:6px;">沒有偵測到失敗 ticker。</div>`
-      }
-      ${
-        logLines
-          ? `<div class="mono" style="white-space:pre-wrap; color:#374151; max-height:160px; overflow:auto;">${logLines}</div>`
-          : ''
-      }
-    </div>
+    <details class="summary-card">
+      <summary>
+        <span>${headline}</span>
+        <span class="summary-hint">${summaryHint}</span>
+      </summary>
+      <div class="summary-body" style="padding:10px 12px;">
+        ${
+          failedLines
+            ? `<div class="mono" style="white-space:pre-wrap; color:#991b1b; margin-bottom:6px;">${failedLines}</div>`
+            : `<div style="color:#374151; font-size:12px; margin-bottom:6px;">本次未偵測到異常，已使用可用資料完成計算。</div>`
+        }
+        ${
+          logLines
+            ? `<div class="mono" style="white-space:pre-wrap; color:#374151; max-height:160px; overflow:auto;">${logLines}</div>`
+            : ''
+        }
+      </div>
+    </details>
   `;
 }

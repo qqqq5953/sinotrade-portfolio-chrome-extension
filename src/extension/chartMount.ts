@@ -1,6 +1,7 @@
 import * as echarts from 'echarts';
 import { buildEchartsOption, type ComputedSeries } from '../core';
 import { mustQuery } from './dom';
+import { WRAPPER_ID } from './tableMount';
 
 function ensureChartContainer(): HTMLDivElement {
   const tagArea = mustQuery<HTMLElement>(document, '#TagSelectArea');
@@ -12,6 +13,11 @@ function ensureChartContainer(): HTMLDivElement {
   div.style.width = '100%';
   div.style.height = '400px';
 
+  const wrapper = document.getElementById(WRAPPER_ID);
+  if (wrapper) {
+    wrapper.appendChild(div);
+    return div;
+  }
   const children = Array.from(tagArea.children);
   const secondChild = children[1] ?? null;
   if (secondChild) tagArea.insertBefore(div, secondChild);

@@ -295,8 +295,6 @@ function recomputeAndRender(): void {
   });
   cachedComputed = computed;
   renderChart(computed, { valueMode });
-  // Re-anchor rules after chart mount/re-mount to keep it between toggles and chart.
-  renderChartRules();
 
   const { closeByTicker, adjByTicker } = buildCloseAdjMaps();
   renderDebugTable(computed.debugRows, {
@@ -307,12 +305,16 @@ function recomputeAndRender(): void {
   });
 
   if (cachedFetchReport) renderPriceFetchReport(cachedFetchReport);
+  // Keep chart rules stable after all blocks have potentially re-positioned.
+  renderChartRules();
 }
 
 function rerenderChartOnly(): void {
   if (!cachedComputed) return;
   renderChart(cachedComputed, { valueMode });
   if (cachedFetchReport) renderPriceFetchReport(cachedFetchReport);
+  // Value mode toggles may move sibling blocks; re-anchor chart rules last.
+  renderChartRules();
 }
 
 function renderToggles(): void {
