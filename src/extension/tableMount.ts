@@ -10,6 +10,9 @@ export const WRAPPER_ID = 'pvs-chart-block';
 
 const BLOCK_ORDER = [FETCH_ID, RULES_ID, TOGGLE_ID, 'chart', TABLE_ID] as const;
 
+/** 主色，用於按鈕、標題等，與網站配色一致 */
+const PRIMARY_COLOR = '#3f5372';
+
 export type PriceMode = 'close' | 'adjclose';
 // Value mode controls chart display (privacy) only.
 export type ValueMode = 'amount' | 'percent' | 'excess';
@@ -30,7 +33,7 @@ function ensureStyle(): void {
   padding: 10px 12px;
   border-bottom: 1px solid #f3f4f6;
   font-weight: 700;
-  color: #3f5372;
+  color: ${PRIMARY_COLOR};
 }
 #${TABLE_ID} .subhdr {
   padding: 8px 12px;
@@ -98,20 +101,18 @@ function ensureStyle(): void {
   padding: 8px;
 }
 #${TOGGLE_ID} .btn-group .btn {
-  border: 1px solid #d9dde3;
-  background: #ffffff;
   border-radius: 4px;
   padding: 6px 10px;
   cursor: pointer;
   font-size: 12px;
-  color: #3f5372;
+  color: ${PRIMARY_COLOR};
 }
 #${TOGGLE_ID} .btn-group .btn:hover {
   background: #f5f6f8;
 }
 #${TOGGLE_ID} .btn-group .btn.active {
-  border-color: #3f5372;
-  background: #3f5372;
+  border-color: ${PRIMARY_COLOR};
+  background: ${PRIMARY_COLOR};
   color: #fff;
 }
 #${TOGGLE_ID} .hint {
@@ -133,7 +134,7 @@ function ensureStyle(): void {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  color: #3f5372;
+  color: ${PRIMARY_COLOR};
   font-weight: 700;
 }
 #${TABLE_ID} details.summary-card > summary::-webkit-details-marker,
@@ -155,7 +156,7 @@ function ensureStyle(): void {
   border-radius: 4px;
   background: #fff;
   padding: 8px 10px;
-  color: #3f5372;
+  color: ${PRIMARY_COLOR};
   font-size: 12px;
 }
 #${RULES_ID} .rules-title {
