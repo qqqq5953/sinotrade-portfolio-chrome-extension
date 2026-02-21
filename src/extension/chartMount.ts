@@ -12,6 +12,7 @@ function ensureChartContainer(): HTMLDivElement {
   div.id = 'chart';
   div.style.width = '100%';
   div.style.height = '400px';
+  div.style.padding = '8px 4px';
 
   const wrapper = document.getElementById(WRAPPER_ID);
   if (wrapper) {

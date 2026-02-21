@@ -21,7 +21,7 @@ function ensureStyle(): void {
   style.textContent = `
 #${TABLE_ID} {
   border: 1px solid #e5e7eb;
-  border-radius: 12px;
+  border-radius: 4px;
   overflow: hidden;
   background: #fff;
   font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
@@ -30,7 +30,7 @@ function ensureStyle(): void {
   padding: 10px 12px;
   border-bottom: 1px solid #f3f4f6;
   font-weight: 700;
-  color: #111827;
+  color: #3f5372;
 }
 #${TABLE_ID} .subhdr {
   padding: 8px 12px;
@@ -88,23 +88,31 @@ function ensureStyle(): void {
   gap: 10px;
   flex-wrap: wrap;
 }
-#${TOGGLE_ID} .btn {
-  border: 1px solid #e5e7eb;
+#${TOGGLE_ID} .btn-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  border-radius: 4px;
+  border: solid 1px #d9dde3;
+  padding: 8px;
+}
+#${TOGGLE_ID} .btn-group .btn {
+  border: 1px solid #d9dde3;
   background: #ffffff;
-  border-radius: 10px;
+  border-radius: 4px;
   padding: 6px 10px;
   cursor: pointer;
   font-size: 12px;
-  color: #111827;
+  color: #3f5372;
 }
-#${TOGGLE_ID} .btn:hover {
-  background: #f9fafb;
+#${TOGGLE_ID} .btn-group .btn:hover {
+  background: #f5f6f8;
 }
-#${TOGGLE_ID} .btn.active {
-  border-color: #111827;
-  background: #ffffff;
-  color: #111827;
-  box-shadow: inset 0 0 0 1px #111827;
+#${TOGGLE_ID} .btn-group .btn.active {
+  border-color: #3f5372;
+  background: #3f5372;
+  color: #fff;
 }
 #${TOGGLE_ID} .hint {
   font-size: 12px;
@@ -113,7 +121,7 @@ function ensureStyle(): void {
 #${TABLE_ID} details.summary-card,
 #${FETCH_ID} details.summary-card {
   border: 1px solid #e5e7eb;
-  border-radius: 12px;
+  border-radius: 4px;
   background: #fff;
 }
 #${TABLE_ID} details.summary-card > summary,
@@ -125,7 +133,7 @@ function ensureStyle(): void {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  color: #111827;
+  color: #3f5372;
   font-weight: 700;
 }
 #${TABLE_ID} details.summary-card > summary::-webkit-details-marker,
@@ -144,15 +152,14 @@ function ensureStyle(): void {
 }
 #${RULES_ID} {
   border: 1px solid #e5e7eb;
-  border-radius: 10px;
+  border-radius: 4px;
   background: #fff;
   padding: 8px 10px;
-  color: #374151;
+  color: #3f5372;
   font-size: 12px;
 }
 #${RULES_ID} .rules-title {
   font-weight: 700;
-  color: #111827;
   margin: 0 0 6px 0;
   font-size: 13px;
 }
@@ -167,6 +174,7 @@ function ensureStyle(): void {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  padding: 8px 0px;
 }
 `;
   document.head.appendChild(style);
@@ -337,8 +345,10 @@ function lookup(series: PriceSeries | undefined, isoDateET: string): number | nu
 export function renderPriceModeToggle(mode: PriceMode, onChange: (mode: PriceMode) => void): void {
   const { priceRow } = ensureToggleRows();
   priceRow.innerHTML = `
-    <button class="btn ${mode === 'close' ? 'active' : ''}" data-mode="close" type="button">Close</button>
-    <button class="btn ${mode === 'adjclose' ? 'active' : ''}" data-mode="adjclose" type="button">Adj Close</button>
+    <div class="btn-group">
+        <button class="btn ${mode === 'close' ? 'active' : ''}" data-mode="close" type="button">Close</button>
+        <button class="btn ${mode === 'adjclose' ? 'active' : ''}" data-mode="adjclose" type="button">Adj Close</button>
+    </div>
     <span class="hint">市值計算口徑（不會重抓資料，僅重算/更新圖表與表格）</span>
   `;
   priceRow.querySelectorAll<HTMLButtonElement>('button[data-mode]').forEach((b) => {
@@ -353,9 +363,11 @@ export function renderPriceModeToggle(mode: PriceMode, onChange: (mode: PriceMod
 export function renderValueModeToggle(mode: ValueMode, onChange: (mode: ValueMode) => void): void {
   const { valueRow } = ensureToggleRows();
   valueRow.innerHTML = `
-    <button class="btn" data-vmode="excess" type="button" title="超額績效% = (投資組合市值 / VTI 市值 - 1) × 100%（相對 VTI 的超額績效%）">超額績效%</button>
-    <button class="btn" data-vmode="percent" type="button" title="投入報酬率% = (市值 / 累積投入金額 - 1) × 100%（投資組合與 VTI 皆以各自市值計）">投入報酬率%</button>
-    <button class="btn" data-vmode="amount" type="button" title="顯示投資組合與 VTI 的市值（金額）">市值</button>
+    <div class="btn-group">
+        <button class="btn" data-vmode="excess" type="button" title="超額績效% = (投資組合市值 / VTI 市值 - 1) × 100%（相對 VTI 的超額績效%）">超額績效%</button>
+        <button class="btn" data-vmode="percent" type="button" title="投入報酬率% = (市值 / 累積投入金額 - 1) × 100%（投資組合與 VTI 皆以各自市值計）">投入報酬率%</button>
+        <button class="btn" data-vmode="amount" type="button" title="顯示投資組合與 VTI 的市值（金額）">市值</button>
+    </div>
     <span class="hint" data-vdesc="1"></span>
   `;
 

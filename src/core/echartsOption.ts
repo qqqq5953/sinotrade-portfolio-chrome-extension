@@ -139,10 +139,23 @@ export function buildEchartsOption(series: ComputedSeries, opts?: { valueMode?: 
   };
 
   return {
-    title: { text: 'Portfolio vs VTI', padding: [0, 0, 8, 0] },
+    title: { 
+        text: 'Portfolio vs VTI', 
+        left: 'center', 
+        padding: [0, 0, 8, 0], 
+        textStyle: { color: '#3f5372', fontSize: 20 }
+    },
     tooltip: { trigger: 'axis', formatter: tooltipFormatter },
-    legend: { data: valueMode === 'excess' ? ['excess vs VTI', 'baseline'] : ['portfolio', 'vti'] },
-    grid: { left: '5%', right: '4%', bottom: '3%', containLabel: true },
+    legend: { 
+        data: valueMode === 'excess' ? ['excess vs VTI', 'baseline'] : ['portfolio', 'vti'], 
+        top: '5%' 
+    },
+    grid: {
+      left: '0%',
+      right: '0%',
+      bottom: '3%',
+      containLabel: true
+    },
     toolbox: { feature: { saveAsImage: {} } },
     xAxis: { type: 'time', boundaryGap: false },
     yAxis:
@@ -151,27 +164,33 @@ export function buildEchartsOption(series: ComputedSeries, opts?: { valueMode?: 
         : valueMode === 'percent'
           ? {
               type: 'value',
-              axisLabel: { formatter: (v: number) => `${v}%` },
-              name: 'Return % (value / cumulativeCash - 1)',
-              nameGap: 23
+              axisLabel: { formatter: (v: number) => `${v}%`, margin: 8 },
+              name: 'Return %',
+              nameGap: 20,
+              nameTextStyle: { align: 'center', padding: [0, 20, 0, 0] },
             }
           : {
               type: 'value',
-              axisLabel: { formatter: (v: number) => `${v}%` },
-              name: 'Excess % (portfolio / vti - 1)',
-              nameGap: 23
+              axisLabel: { formatter: (v: number) => `${v}%`, margin: 8 },
+              name: 'Excess %',
+              nameGap: 20,
+              nameTextStyle: { align: 'center', padding: [0, 12, 0, 0] },
             },
     series: [
       {
         name: valueMode === 'excess' ? 'excess vs VTI' : 'portfolio',
         type: 'line',
         showSymbol: false,
+        lineStyle: { color: '#c43826' },
+        itemStyle: { color: '#c43826' },
         data: portfolioData
       },
       {
         name: valueMode === 'excess' ? 'baseline' : 'vti',
         type: 'line',
         showSymbol: false,
+        lineStyle: { color: '#3f5372' },
+        itemStyle: { color: '#3f5372' },
         data: vtiData
       }
     ]
