@@ -8,7 +8,22 @@ const RULES_ID = 'pvs-chart-rules';
 /** Wrapper for all extension UI under #TagSelectArea (flex column, gap). */
 export const WRAPPER_ID = 'pvs-chart-block';
 
-const BLOCK_ORDER = [FETCH_ID, RULES_ID, TOGGLE_ID, 'chart', TABLE_ID] as const;
+const ACCORDION_ID = 'pvs-accordion';
+const ACCORDION_BODY_ID = 'pvs-accordion-body';
+const ACCORDION_LOADER_ID = 'pvs-accordion-loader';
+
+const RULES_DETAILS_ID = 'pvs-rules-details';
+const FETCH_DETAILS_ID = 'pvs-fetch-details';
+const DEBUG_DETAILS_ID = 'pvs-debug-details';
+
+const BLOCK_ORDER = [TOGGLE_ID, 'chart', RULES_DETAILS_ID, FETCH_DETAILS_ID, DEBUG_DETAILS_ID] as const;
+
+/** When set (e.g. accordion body), chart block is inserted here instead of TagSelectArea. */
+let chartBlockParent: HTMLElement | null = null;
+
+export function setChartBlockParent(el: HTMLElement | null): void {
+  chartBlockParent = el;
+}
 
 /** 主色，用於按鈕、標題等，與網站配色一致 */
 const PRIMARY_COLOR = '#3f5372';
@@ -177,12 +192,47 @@ function ensureStyle(): void {
   gap: 8px;
   padding: 8px 0px;
 }
+#${ACCORDION_ID} {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  margin: 8px 0;
+}
+#${ACCORDION_ID} summary {
+  padding: 10px 12px;
+  cursor: pointer;
+  font-weight: 700;
+  color: ${PRIMARY_COLOR};
+  list-style: none;
+  user-select: none;
+}
+#${ACCORDION_ID} summary::-webkit-details-marker { display: none; }
+#${ACCORDION_LOADER_ID} {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px;
+  color: #6b7280;
+  font-size: 14px;
+}
+#${ACCORDION_LOADER_ID} .pvs-spin {
+  width: 18px;
+  height: 18px;
+  border: 2px solid #e5e7eb;
+  border-top-color: ${PRIMARY_COLOR};
+  border-radius: 999px;
+  animation: pvs-spin 0.9s linear infinite;
+}
+@keyframes pvs-spin { to { transform: rotate(360deg); } }
 `;
   document.head.appendChild(style);
 }
 
+function getTagArea(): HTMLElement | null {
+  return document.getElementById('TagSelectArea') as HTMLElement | null;
+}
+
 function ensurePvsWrapper(): HTMLDivElement {
-  const tagArea = document.getElementById('TagSelectArea') as HTMLElement | null;
+  const tagArea = getTagArea();
   let wrapper = document.getElementById(WRAPPER_ID) as HTMLDivElement | null;
   if (wrapper) {
     orderWrapperChildren(wrapper);
@@ -191,13 +241,18 @@ function ensurePvsWrapper(): HTMLDivElement {
   if (!tagArea) throw new Error('TagSelectArea not found');
   wrapper = document.createElement('div');
   wrapper.id = WRAPPER_ID;
-  const children = Array.from(tagArea.children);
-  const insertBefore = children[1] ?? null;
-  if (insertBefore) tagArea.insertBefore(wrapper, insertBefore);
-  else tagArea.appendChild(wrapper);
+  const parent = chartBlockParent ?? tagArea;
+  if (parent !== tagArea) {
+    parent.appendChild(wrapper);
+  } else {
+    const children = Array.from(tagArea.children);
+    const insertBefore = children[1] ?? null;
+    if (insertBefore) tagArea.insertBefore(wrapper, insertBefore);
+    else tagArea.appendChild(wrapper);
+  }
   for (const id of BLOCK_ORDER) {
     const el = document.getElementById(id);
-    if (el && el.parentElement === tagArea) wrapper.appendChild(el);
+    if (el && (el.parentElement === tagArea || el.parentElement?.id === ACCORDION_BODY_ID)) wrapper.appendChild(el);
   }
   return wrapper;
 }
@@ -209,19 +264,119 @@ function orderWrapperChildren(wrapper: HTMLElement): void {
   }
 }
 
+export type AccordionRef = { details: HTMLDetailsElement; body: HTMLDivElement };
+
+export function mountAccordion(opts?: { onUpdate?: () => void }): AccordionRef {
+  ensureStyle();
+  const tagArea = getTagArea();
+  if (!tagArea) throw new Error('TagSelectArea not found');
+  let details = document.getElementById(ACCORDION_ID) as HTMLDetailsElement | null;
+  if (details) {
+    const body = document.getElementById(ACCORDION_BODY_ID) as HTMLDivElement;
+    return { details, body: body! };
+  }
+  details = document.createElement('details');
+  details.id = ACCORDION_ID;
+  const summary = document.createElement('summary');
+  summary.style.display = 'flex';
+  summary.style.alignItems = 'center';
+  summary.style.justifyContent = 'space-between';
+  summary.style.gap = '8px';
+  const title = document.createElement('span');
+  title.textContent = '圖表與分析';
+  summary.appendChild(title);
+  if (opts?.onUpdate) {
+    const updateBtn = document.createElement('button');
+    updateBtn.type = 'button';
+    updateBtn.textContent = '更新資料';
+    updateBtn.style.fontSize = '12px';
+    updateBtn.style.fontWeight = '400';
+    updateBtn.style.cursor = 'pointer';
+    updateBtn.style.border = '1px solid #d9dde3';
+    updateBtn.style.borderRadius = '4px';
+    updateBtn.style.padding = '4px 8px';
+    updateBtn.style.background = '#fff';
+    updateBtn.style.color = PRIMARY_COLOR;
+    updateBtn.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      opts.onUpdate!();
+    };
+    summary.appendChild(updateBtn);
+  }
+  details.appendChild(summary);
+  const body = document.createElement('div');
+  body.id = ACCORDION_BODY_ID;
+  details.appendChild(body);
+  const children = Array.from(tagArea.children);
+  const insertBefore = children[1] ?? null;
+  if (insertBefore) tagArea.insertBefore(details, insertBefore);
+  else tagArea.appendChild(details);
+  return { details, body };
+}
+
+export function setAccordionBodyLoading(show: boolean): void {
+  const body = document.getElementById(ACCORDION_BODY_ID) as HTMLDivElement | null;
+  if (!body) return;
+  const loader = document.getElementById(ACCORDION_LOADER_ID);
+  if (show) {
+    if (loader) return;
+    const div = document.createElement('div');
+    div.id = ACCORDION_LOADER_ID;
+    div.innerHTML = '<div class="pvs-spin"></div><span>資料處理中</span>';
+    body.appendChild(div);
+  } else {
+    loader?.remove();
+  }
+}
+
+export function isAccordionOpen(): boolean {
+  const details = document.getElementById(ACCORDION_ID) as HTMLDetailsElement | null;
+  return details?.open ?? false;
+}
+
+export function openAccordion(open: boolean): void {
+  const details = document.getElementById(ACCORDION_ID) as HTMLDetailsElement | null;
+  if (details) details.open = open;
+}
+
+export function setAccordionExpandCallback(cb: (open: boolean) => void): void {
+  const details = document.getElementById(ACCORDION_ID) as HTMLDetailsElement | null;
+  if (!details) return;
+  details.addEventListener('toggle', () => cb(details.open));
+}
+
+function ensureDetailsInWrapper(
+  wrapper: HTMLElement,
+  detailsId: string,
+  summaryText: string,
+  contentId: string
+): HTMLDivElement {
+  let details = document.getElementById(detailsId) as HTMLDetailsElement | null;
+  if (!details) {
+    details = document.createElement('details');
+    details.id = detailsId;
+    const sum = document.createElement('summary');
+    sum.textContent = summaryText;
+    details.appendChild(sum);
+    wrapper.appendChild(details);
+  }
+  let content = document.getElementById(contentId) as HTMLDivElement | null;
+  if (!content) {
+    content = document.createElement('div');
+    content.id = contentId;
+    details.appendChild(content);
+  } else if (content.parentElement !== details) {
+    details.appendChild(content);
+  }
+  orderWrapperChildren(wrapper);
+  return content;
+}
+
 function ensureContainerAfterChart(): HTMLDivElement {
   ensureStyle();
   const wrapper = ensurePvsWrapper();
-  const existing = document.getElementById(TABLE_ID) as HTMLDivElement | null;
-  if (existing) {
-    if (existing.parentElement !== wrapper) wrapper.appendChild(existing);
-    orderWrapperChildren(wrapper);
-    return existing;
-  }
-  const div = document.createElement('div');
-  div.id = TABLE_ID;
-  wrapper.appendChild(div);
-  return div;
+  return ensureDetailsInWrapper(wrapper, DEBUG_DETAILS_ID, '進階資料檢查（Debug）', TABLE_ID);
 }
 
 function ensureToggleBeforeChart(): HTMLDivElement {
@@ -268,33 +423,13 @@ function ensureToggleRows(): { root: HTMLDivElement; valueRow: HTMLDivElement; p
 function ensureFetchReportAfterToggle(): HTMLDivElement {
   ensureStyle();
   const wrapper = ensurePvsWrapper();
-  const existing = document.getElementById(FETCH_ID) as HTMLDivElement | null;
-  if (existing) {
-    if (existing.parentElement !== wrapper) wrapper.appendChild(existing);
-    orderWrapperChildren(wrapper);
-    return existing;
-  }
-  const div = document.createElement('div');
-  div.id = FETCH_ID;
-  wrapper.appendChild(div);
-  orderWrapperChildren(wrapper);
-  return div;
+  return ensureDetailsInWrapper(wrapper, FETCH_DETAILS_ID, '抓價報告', FETCH_ID);
 }
 
 function ensureRulesBetweenToggleAndChart(): HTMLDivElement {
   ensureStyle();
   const wrapper = ensurePvsWrapper();
-  const existing = document.getElementById(RULES_ID) as HTMLDivElement | null;
-  if (existing) {
-    if (existing.parentElement !== wrapper) wrapper.appendChild(existing);
-    orderWrapperChildren(wrapper);
-    return existing;
-  }
-  const div = document.createElement('div');
-  div.id = RULES_ID;
-  wrapper.appendChild(div);
-  orderWrapperChildren(wrapper);
-  return div;
+  return ensureDetailsInWrapper(wrapper, RULES_DETAILS_ID, '圖表呈現規則', RULES_ID);
 }
 
 function fmt(n: number): string {

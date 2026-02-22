@@ -19,6 +19,11 @@ import {
 } from './collector';
 import { renderChart } from './chartMount';
 import {
+  mountAccordion,
+  setAccordionBodyLoading,
+  setChartBlockParent,
+  openAccordion,
+  setAccordionExpandCallback,
   renderChartRules,
   renderDebugTable,
   renderPriceFetchReport,
@@ -49,6 +54,13 @@ declare const chrome: any;
 
 const BUY_INPUT_ID = 'BuyInfo_QueryDateRange';
 const BUY_TABLE_SELECTOR = '.query-result-area .buy-table-area table.buy-table.default-table.h5';
+
+const TRANSACTION_URL = 'https://aiinvest.sinotrade.com.tw/Account/Transaction';
+
+function isTransactionBuyPage(): boolean {
+  if (!window.location.href.startsWith(TRANSACTION_URL)) return false;
+  return document.querySelector(`#${BUY_INPUT_ID}`) != null;
+}
 
 function uniq<T>(arr: T[]): T[] {
   return [...new Set(arr)];
@@ -301,7 +313,8 @@ function recomputeAndRender(): void {
     mode: priceMode,
     closeSeriesByTicker: closeByTicker,
     adjSeriesByTicker: adjByTicker,
-    anchorTicker: 'VTI'
+    anchorTicker: 'VTI',
+    ...(cachedFetchReport ? { fetchReport: cachedFetchReport } : {})
   });
 
   if (cachedFetchReport) renderPriceFetchReport(cachedFetchReport);
@@ -528,52 +541,74 @@ async function resumeIfNeeded(): Promise<boolean> {
   return false;
 }
 
-function mountButton(): void {
-  console.log('mountButton');
-  if (document.querySelector('#portfolio-vti-btn')) return;
-  const btn = document.createElement('button');
-  btn.id = 'portfolio-vti-btn';
-  btn.textContent = '產生折線圖';
-  btn.style.position = 'fixed';
-  btn.style.right = '16px';
-  btn.style.bottom = '16px';
-  btn.style.zIndex = '999999';
-  btn.style.padding = '10px 12px';
-  btn.style.borderRadius = '10px';
-  btn.style.border = '1px solid #111827';
-  btn.style.background = '#111827';
-  btn.style.color = '#fff';
-  btn.style.cursor = 'pointer';
-  btn.onclick = async () => {
-    btn.disabled = true;
-    try {
-      const startYear = getMinDateYearFromPage(BUY_INPUT_ID);
-      const endYear = new Date().getFullYear();
-      const cached = await getBuyEvents();
-      const cacheHit =
-        cached &&
-        cached.events.length > 0 &&
-        cached.startYear === startYear &&
-        cached.endYear === endYear;
-      if (cacheHit) {
-        setStatus('使用快取買入資料，計算與產生圖表中…', { spinning: true });
-        await computeAndRender(cached.events);
-        setStatusDone('已完成');
-        return;
-      }
+async function runOnAccordionExpand(body: HTMLDivElement): Promise<void> {
+  setAccordionBodyLoading(true);
+  setChartBlockParent(body);
+  try {
+    const startYear = getMinDateYearFromPage(BUY_INPUT_ID);
+    const endYear = new Date().getFullYear();
+    const cached = await getBuyEvents();
+    const cacheHit =
+      cached &&
+      cached.events.length > 0 &&
+      cached.startYear === startYear &&
+      cached.endYear === endYear;
+    if (cacheHit) {
+      setStatus('使用快取買入資料，計算與產生圖表中…', { spinning: true });
+      await computeAndRender(cached.events);
+      setStatusDone('已完成');
+    } else {
       await clearRunState();
       await startFlow();
-    } catch (e) {
-      showError(e);
-      setStatusError(`mountButton-產生失敗：${e instanceof Error ? e.message : String(e)}`);
-    } finally {
-      btn.disabled = false;
     }
-  };
-  document.body.appendChild(btn);
+  } catch (e) {
+    showError(e);
+    setStatusError(`產生失敗：${e instanceof Error ? e.message : String(e)}`);
+  } finally {
+    setAccordionBodyLoading(false);
+    setChartBlockParent(null);
+  }
 }
 
-mountButton();
+function initBuyPage(): void {
+  if (!isTransactionBuyPage()) return;
+
+  const { body } = mountAccordion({
+    onUpdate: () => {
+      setAccordionBodyLoading(true);
+      startFlow();
+    }
+  });
+
+  setAccordionExpandCallback((open) => {
+    if (!open) return;
+    loadRunState().then((s) => {
+      if (s && (s.stage === 'buy_submitted' || s.stage === 'computing')) return;
+      runOnAccordionExpand(body);
+    });
+  });
+
+  loadRunState().then(async (state) => {
+    if (!state || state.v !== 1) return;
+    if (state.stage !== 'buy_submitted' && state.stage !== 'computing') return;
+    openAccordion(true);
+    setAccordionBodyLoading(true);
+    setChartBlockParent(body);
+    try {
+      const didResume = await resumeIfNeeded();
+      if (didResume) setStatusDone('已完成');
+    } catch (e) {
+      console.error(e);
+      setStatusError(`resumeIfNeeded-產生失敗：${e instanceof Error ? e.message : String(e)}（已重置狀態）`);
+      clearRunState().catch((err) => console.error(err));
+    } finally {
+      setAccordionBodyLoading(false);
+      setChartBlockParent(null);
+    }
+  });
+}
+
+initBuyPage();
 
 // Manual stop/reset: clears persisted state so refresh won't resume.
 window.addEventListener(getStopEventName(), () => {
@@ -583,12 +618,5 @@ window.addEventListener(getStopEventName(), () => {
       console.error(e);
       setStatusError(`停止失敗：${e instanceof Error ? e.message : String(e)}`);
     });
-});
-
-// Auto-resume if switching tab caused reload.
-resumeIfNeeded().catch((e) => {
-  console.error(e);
-  setStatusError(`resumeIfNeeded-產生失敗：${e instanceof Error ? e.message : String(e)}（已重置狀態）`);
-  clearRunState().catch((err) => console.error(err));
 });
 
