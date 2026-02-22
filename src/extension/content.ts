@@ -591,6 +591,7 @@ function initBuyPage(): void {
   loadRunState().then(async (state) => {
     if (!state || state.v !== 1) return;
     if (state.stage !== 'buy_submitted' && state.stage !== 'computing') return;
+    setStatus('資料處理中…', { spinning: true });
     openAccordion(true);
     setAccordionBodyLoading(true);
     setChartBlockParent(body);
