@@ -12,6 +12,7 @@ const ACCORDION_ID = 'pvs-accordion';
 const ACCORDION_BODY_ID = 'pvs-accordion-body';
 const ACCORDION_LOADER_ID = 'pvs-accordion-loader';
 const ACCORDION_STATUS_ID = 'pvs-accordion-status';
+const FETCH_STATUS_ICON_ID = 'pvs-fetch-status-icon';
 
 const RULES_DETAILS_ID = 'pvs-rules-details';
 const FETCH_DETAILS_ID = 'pvs-fetch-details';
@@ -44,12 +45,6 @@ function ensureStyle(): void {
   overflow: hidden;
   background: #fff;
   font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
-}
-#${TABLE_ID} .hdr {
-  padding: 10px 12px;
-  border-bottom: 1px solid #f3f4f6;
-  font-weight: 700;
-  color: ${PRIMARY_COLOR};
 }
 #${TABLE_ID} .subhdr {
   padding: 8px 12px;
@@ -135,33 +130,44 @@ function ensureStyle(): void {
   font-size: 12px;
   color: #6b7280;
 }
-#${FETCH_ID} details.summary-card {
-  border: 1px solid #e5e7eb;
-  border-radius: 4px;
-  background: #fff;
-}
-#${FETCH_ID} details.summary-card > summary {
-  list-style: none;
-  cursor: pointer;
-  padding: 10px 12px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  color: ${PRIMARY_COLOR};
-  font-weight: 700;
-}
-#${FETCH_ID} details.summary-card > summary::-webkit-details-marker {
-  display: none;
-}
-#${FETCH_ID} .summary-hint {
+#${FETCH_ID} .fetch-report-headline {
+  padding: 10px 24px 0;
   font-size: 12px;
-  color: #6b7280;
-  font-weight: 400;
+  font-weight: 600;
+  color: ${PRIMARY_COLOR};
 }
 #${TABLE_ID} .summary-body,
 #${FETCH_ID} .summary-body {
   border-top: 1px solid #f3f4f6;
+}
+#${ACCORDION_ID} .pvs-accordion-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+#${ACCORDION_ID} .${FETCH_STATUS_ICON_ID} {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 4px;
+  cursor: pointer;
+  color: ${PRIMARY_COLOR};
+  flex-shrink: 0;
+}
+#${ACCORDION_ID} .${FETCH_STATUS_ICON_ID}:hover {
+  background: #f5f6f8;
+}
+#${ACCORDION_ID} .${FETCH_STATUS_ICON_ID}.pvs-fetch-error {
+  color: #c43826;
+  border-color: #c43826;
+}
+#${ACCORDION_ID} .${FETCH_STATUS_ICON_ID} svg {
+  width: 14px;
+  height: 14px;
+  stroke: currentColor;
 }
 #${RULES_ID} {
   border: 1px solid #e5e7eb;
@@ -185,9 +191,9 @@ function ensureStyle(): void {
   padding: 8px 0px;
 }
 #${ACCORDION_ID} {
-  border: 1px solid #e5e7eb;
+  border: 1px solid #d9dde3;
   border-radius: 8px;
-  margin: 8px 0;
+  margin: 40px 0 0;
   padding: 0 8px;
 }
 #${ACCORDION_ID} summary {
@@ -285,9 +291,20 @@ export function mountAccordion(opts?: { onUpdate?: () => void }): AccordionRef {
   summary.style.alignItems = 'center';
   summary.style.justifyContent = 'space-between';
   summary.style.gap = '8px';
+  const titleRow = document.createElement('div');
+  titleRow.className = 'pvs-accordion-title-row';
   const title = document.createElement('span');
   title.textContent = '圖表與分析';
-  summary.appendChild(title);
+  titleRow.appendChild(title);
+  const statusIcon = document.createElement('button');
+  statusIcon.type = 'button';
+  statusIcon.id = FETCH_STATUS_ICON_ID;
+  statusIcon.className = FETCH_STATUS_ICON_ID;
+  statusIcon.setAttribute('aria-label', '抓價報告');
+  statusIcon.style.display = 'none';
+  statusIcon.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y1="13"/><line x1="16" y1="17" x2="8" y1="17"/><line x1="10" y1="9" x2="8" y1="9"/></svg>`;
+  titleRow.appendChild(statusIcon);
+  summary.appendChild(titleRow);
   if (opts?.onUpdate) {
     const updateBtn = document.createElement('button');
     updateBtn.type = 'button';
@@ -359,6 +376,24 @@ export function setAccordionStatusError(text: string): void {
   }
   el.textContent = text;
   el.classList.add('pvs-status-error');
+}
+
+export function setFetchReportStatusIcon(failedCount: number): void {
+  const icon = document.getElementById(FETCH_STATUS_ICON_ID) as HTMLButtonElement | null;
+  if (!icon) return;
+  icon.style.display = 'inline-flex';
+  icon.classList.toggle('pvs-fetch-error', failedCount > 0);
+  icon.title =
+    failedCount === 0 ? '抓價報告：正常' : `抓價報告：有 ${failedCount} 檔異常，點擊查看`;
+  icon.onclick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const details = document.getElementById(FETCH_DETAILS_ID) as HTMLDetailsElement | null;
+    if (details) {
+      details.open = true;
+      details.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  };
 }
 
 export function isAccordionOpen(): boolean {
@@ -700,7 +735,6 @@ export function renderPriceFetchReport(report: {
   const headline = `${failed.length === 0 ? '資料同步完成' : '資料同步完成（部分項目需留意）'}${
     durMs == null ? '' : `（${(durMs / 1000).toFixed(1)}s）`
   }`;
-  const summaryHint = failed.length === 0 ? '本次未偵測到異常。查看詳情' : `其中 ${failed.length} 檔抓價異常。查看詳情`;
 
   const failedLines =
     failed.length === 0 ? '' : failed.map((f) => `- ${f.ticker}: ${f.reason}`).join('\n');
@@ -721,23 +755,19 @@ export function renderPriceFetchReport(report: {
           .join('\n');
 
   div.innerHTML = `
-    <details class="summary-card">
-      <summary>
-        <span>${headline}</span>
-        <span class="summary-hint">${summaryHint}</span>
-      </summary>
-      <div class="summary-body" style="padding:10px 12px;">
-        ${
-          failedLines
-            ? `<div class="mono" style="white-space:pre-wrap; color:#991b1b; margin-bottom:6px;">${failedLines}</div>`
-            : `<div style="color:#374151; font-size:12px; margin-bottom:6px;">本次未偵測到異常，已使用可用資料完成計算。</div>`
-        }
-        ${
-          logLines
-            ? `<div class="mono" style="white-space:pre-wrap; color:#374151; max-height:160px; overflow:auto;">${logLines}</div>`
-            : ''
-        }
-      </div>
-    </details>
+    <div class="fetch-report-headline">${headline}</div>
+    <div class="summary-body" style="padding:10px 24px;">
+      ${
+        failedLines
+          ? `<div class="mono" style="white-space:pre-wrap; color:#991b1b; margin-bottom:6px;">${failedLines}</div>`
+          : `<div style="color:#374151; font-size:12px; margin-bottom:6px;">本次未偵測到異常，已使用可用資料完成計算。</div>`
+      }
+      ${
+        logLines
+          ? `<div class="mono" style="white-space:pre-wrap; color:#374151; max-height:160px; overflow:auto;">${logLines}</div>`
+          : ''
+      }
+    </div>
   `;
+  setFetchReportStatusIcon(failed.length);
 }
