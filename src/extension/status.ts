@@ -54,14 +54,18 @@ function ensureStyle(): void {
   animation: pvs_spin 0.9s linear infinite;
 }
 @keyframes pvs_spin { to { transform: rotate(360deg); } }
-#${MASK_ID} .stop {
-  margin: 0 16px 14px;
-  width: calc(100% - 32px);
-  max-width: 200px;
-  display: block;
-  margin-left: auto;
-  margin-right: auto;
+#${MASK_ID} .btns {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
   margin-bottom: 14px;
+  padding: 0 16px;
+}
+#${MASK_ID} .btns button {
+  flex: 1;
+  min-width: 0;
+  max-width: 140px;
+  min-height: 40px;
   border: 1px solid #d9dde3;
   background: #fff;
   border-radius: 8px;
@@ -69,8 +73,9 @@ function ensureStyle(): void {
   cursor: pointer;
   font-size: 14px;
   color: #3f5372;
+  box-sizing: border-box;
 }
-#${MASK_ID} .stop:hover {
+#${MASK_ID} .btns button:hover {
   background: #f5f6f8;
 }
 `;
@@ -98,21 +103,23 @@ function ensureMask(): HTMLDivElement {
         <div class="spin" data-spin="1"></div>
         <span>豐存股折線圖</span>
       </div>
-      <div class="body" data-body="1">準備中…</div>
-      <button class="stop" type="button">停止</button>
+      <div class="body" data-body="1">資料處理中</div>
+      <div class="btns">
+        <button class="stop" type="button">停止</button>
+        <button class="close" type="button">關閉</button>
+      </div>
     </div>
   `;
   div.querySelector<HTMLButtonElement>('button.stop')!.onclick = () => {
     window.dispatchEvent(new CustomEvent(STOP_EVENT));
   };
+  div.querySelector<HTMLButtonElement>('button.close')!.onclick = () => removeMask();
   document.body.appendChild(div);
   return div;
 }
 
-export function setStatus(text: string, opts: { spinning?: boolean } = {}): void {
+export function setStatus(_text: string, opts: { spinning?: boolean } = {}): void {
   const mask = ensureMask();
-  const body = mask.querySelector('[data-body="1"]') as HTMLElement;
-  body.textContent = text;
   const spin = mask.querySelector('[data-spin="1"]') as HTMLElement | null;
   const spinning = opts.spinning ?? true;
   if (spin) spin.style.display = spinning ? 'inline-block' : 'none';
@@ -120,18 +127,11 @@ export function setStatus(text: string, opts: { spinning?: boolean } = {}): void
 
 const MASK_DISMISS_MS = 400;
 
-export function setStatusDone(text = '已完成'): void {
-  setStatus(text, { spinning: false });
+export function setStatusDone(_text = '已完成'): void {
   setTimeout(removeMask, MASK_DISMISS_MS);
 }
 
-export function setStatusError(text: string): void {
-  const mask = ensureMask();
-  const body = mask.querySelector('[data-body="1"]') as HTMLElement;
-  body.textContent = text;
-  body.style.color = '#991b1b';
-  const spin = mask.querySelector('[data-spin="1"]') as HTMLElement | null;
-  if (spin) spin.style.display = 'none';
+export function setStatusError(_text: string): void {
   setTimeout(removeMask, MASK_DISMISS_MS);
 }
 

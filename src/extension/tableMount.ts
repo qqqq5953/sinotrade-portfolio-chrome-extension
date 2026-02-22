@@ -11,6 +11,7 @@ export const WRAPPER_ID = 'pvs-chart-block';
 const ACCORDION_ID = 'pvs-accordion';
 const ACCORDION_BODY_ID = 'pvs-accordion-body';
 const ACCORDION_LOADER_ID = 'pvs-accordion-loader';
+const ACCORDION_STATUS_ID = 'pvs-accordion-status';
 
 const RULES_DETAILS_ID = 'pvs-rules-details';
 const FETCH_DETAILS_ID = 'pvs-fetch-details';
@@ -134,13 +135,11 @@ function ensureStyle(): void {
   font-size: 12px;
   color: #6b7280;
 }
-#${TABLE_ID} details.summary-card,
 #${FETCH_ID} details.summary-card {
   border: 1px solid #e5e7eb;
   border-radius: 4px;
   background: #fff;
 }
-#${TABLE_ID} details.summary-card > summary,
 #${FETCH_ID} details.summary-card > summary {
   list-style: none;
   cursor: pointer;
@@ -152,11 +151,9 @@ function ensureStyle(): void {
   color: ${PRIMARY_COLOR};
   font-weight: 700;
 }
-#${TABLE_ID} details.summary-card > summary::-webkit-details-marker,
 #${FETCH_ID} details.summary-card > summary::-webkit-details-marker {
   display: none;
 }
-#${TABLE_ID} .summary-hint,
 #${FETCH_ID} .summary-hint {
   font-size: 12px;
   color: #6b7280;
@@ -173,11 +170,6 @@ function ensureStyle(): void {
   padding: 8px 10px;
   color: ${PRIMARY_COLOR};
   font-size: 12px;
-}
-#${RULES_ID} .rules-title {
-  font-weight: 700;
-  margin: 0 0 6px 0;
-  font-size: 13px;
 }
 #${RULES_ID} ul {
   margin: 0;
@@ -196,6 +188,7 @@ function ensureStyle(): void {
   border: 1px solid #e5e7eb;
   border-radius: 8px;
   margin: 8px 0;
+  padding: 0 8px;
 }
 #${ACCORDION_ID} summary {
   padding: 10px 12px;
@@ -223,6 +216,16 @@ function ensureStyle(): void {
   animation: pvs-spin 0.9s linear infinite;
 }
 @keyframes pvs-spin { to { transform: rotate(360deg); } }
+#${ACCORDION_STATUS_ID} {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #374151;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+#${ACCORDION_STATUS_ID}.pvs-status-error {
+  color: #991b1b;
+}
 `;
   document.head.appendChild(style);
 }
@@ -307,6 +310,7 @@ export function mountAccordion(opts?: { onUpdate?: () => void }): AccordionRef {
   details.appendChild(summary);
   const body = document.createElement('div');
   body.id = ACCORDION_BODY_ID;
+  body.style.padding = '0 12px';
   details.appendChild(body);
   const children = Array.from(tagArea.children);
   const insertBefore = children[1] ?? null;
@@ -319,15 +323,42 @@ export function setAccordionBodyLoading(show: boolean): void {
   const body = document.getElementById(ACCORDION_BODY_ID) as HTMLDivElement | null;
   if (!body) return;
   const loader = document.getElementById(ACCORDION_LOADER_ID);
+  const statusEl = document.getElementById(ACCORDION_STATUS_ID);
   if (show) {
-    if (loader) return;
-    const div = document.createElement('div');
-    div.id = ACCORDION_LOADER_ID;
-    div.innerHTML = '<div class="pvs-spin"></div><span>資料處理中</span>';
-    body.appendChild(div);
+    loader?.remove();
+    statusEl?.remove();
+    const loaderDiv = document.createElement('div');
+    loaderDiv.id = ACCORDION_LOADER_ID;
+    loaderDiv.innerHTML = '<div class="pvs-spin"></div><span>資料處理中</span>';
+    body.appendChild(loaderDiv);
+    const statusDiv = document.createElement('div');
+    statusDiv.id = ACCORDION_STATUS_ID;
+    body.appendChild(statusDiv);
   } else {
     loader?.remove();
+    statusEl?.remove();
   }
+}
+
+export function setAccordionStatusText(text: string): void {
+  const el = document.getElementById(ACCORDION_STATUS_ID);
+  if (!el) return;
+  el.textContent = text;
+  el.classList.remove('pvs-status-error');
+}
+
+export function setAccordionStatusError(text: string): void {
+  const body = document.getElementById(ACCORDION_BODY_ID) as HTMLDivElement | null;
+  if (!body) return;
+  document.getElementById(ACCORDION_LOADER_ID)?.remove();
+  let el = document.getElementById(ACCORDION_STATUS_ID);
+  if (!el) {
+    el = document.createElement('div');
+    el.id = ACCORDION_STATUS_ID;
+    body.appendChild(el);
+  }
+  el.textContent = text;
+  el.classList.add('pvs-status-error');
 }
 
 export function isAccordionOpen(): boolean {
@@ -525,8 +556,6 @@ export function renderValueModeToggle(mode: ValueMode, onChange: (mode: ValueMod
   }
 }
 
-const RULES_TITLE = '圖表呈現規則';
-
 export function renderChartRules(): void {
   const div = ensureRulesBetweenToggleAndChart();
   const items = [
@@ -534,7 +563,7 @@ export function renderChartRules(): void {
     '拆股還原規則：僅套用 splitDate > tradeDate（同日不套用）',
     '若價格有回補，會標示使用的實際日期'
   ];
-  div.innerHTML = `<div class="rules-title">${RULES_TITLE}</div><ul>${items.map((x) => `<li>${x}</li>`).join('')}</ul>`;
+  div.innerHTML = `<ul>${items.map((x) => `<li>${x}</li>`).join('')}</ul>`;
 }
 
 export function renderDebugTable(
@@ -563,7 +592,6 @@ export function renderDebugTable(
   const div = ensureContainerAfterChart();
   const anchorTicker = opts.anchorTicker ?? 'VTI';
   const modeLabel = opts.mode === 'close' ? 'Close' : 'Adj Close';
-  const summaryHint = '顯示運算所用資料'
   const noteItems = [
     `目前市值計算口徑：${modeLabel}`,
     '比較規則：BUY-only（SELL 不納入比較）',
@@ -572,17 +600,12 @@ export function renderDebugTable(
   ];
 
   const html = `
-    <details class="summary-card">
-      <summary>
-        <span>進階資料檢查（Debug）</span>
-        <span class="summary-hint">${summaryHint}</span>
-      </summary>
-      <div class="summary-body">
-        <div class="subhdr">
-          <ul>${noteItems.map((x) => `<li>${x}</li>`).join('')}</ul>
-        </div>
-        <div style="overflow:auto; max-height: 520px;">
-          <table>
+    <div class="summary-body">
+      <div class="subhdr">
+        <ul>${noteItems.map((x) => `<li>${x}</li>`).join('')}</ul>
+      </div>
+      <div style="overflow:auto; max-height: 520px;">
+        <table>
             <thead>
               <tr>
                 <th>事件日期</th>
@@ -650,9 +673,8 @@ export function renderDebugTable(
             .join('')}
             </tbody>
           </table>
-        </div>
       </div>
-    </details>
+    </div>
   `;
 
   div.innerHTML = html;

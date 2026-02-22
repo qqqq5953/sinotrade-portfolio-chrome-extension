@@ -21,6 +21,8 @@ import { renderChart } from './chartMount';
 import {
   mountAccordion,
   setAccordionBodyLoading,
+  setAccordionStatusText,
+  setAccordionStatusError,
   setChartBlockParent,
   openAccordion,
   setAccordionExpandCallback,
@@ -29,6 +31,7 @@ import {
   renderPriceFetchReport,
   renderPriceModeToggle,
   renderValueModeToggle,
+  WRAPPER_ID,
   type PriceMode,
   type ValueMode
 } from './tableMount';
@@ -208,9 +211,9 @@ async function fetchYahooJsonWithRetry(
     if (!retriable || isLast) return resp;
 
     const backoffMs = 1000 * Math.pow(2, attempt - 1); // 1s/2s/4s...
-    setStatus(`Yahoo 抓價重試中… ${args.ticker} (${yearLabel}) 第 ${attempt}/${maxAttempts} 次失敗，${backoffMs / 1000}s 後重試`, {
-      spinning: true
-    });
+    const retryMsg = `Yahoo 抓價重試中… ${args.ticker} (${yearLabel}) 第 ${attempt}/${maxAttempts} 次失敗，${backoffMs / 1000}s 後重試`;
+    setStatus(retryMsg, { spinning: true });
+    setAccordionStatusText(retryMsg);
     await sleepMs(backoffMs);
   }
 
@@ -238,7 +241,9 @@ async function fetchAndParseSeriesPair(
     Date.parse(period2) / 1000
   )}`;
 
-  setStatus(`抓取股價中… ${symbol}（${startYear}–${endYear}）`, { spinning: true });
+  const fetchMsg = `抓取股價中… ${symbol}（${startYear}–${endYear}）`;
+  setStatus(fetchMsg, { spinning: true });
+  setAccordionStatusText(fetchMsg);
   const resp = await fetchYahooJsonWithRetry(
     { ticker: symbol, year: startYear, endYear, url },
     report
@@ -456,7 +461,9 @@ async function startFlow(): Promise<void> {
   const y = startYear;
   const rangeText = yearRangeText(y);
 
-  setStatus(`抓取買入資料中…（${rangeText}）\n模式：BUY-only（SELL 事件不納入比較）`, { spinning: true });
+  const buyMsg = `抓取買入資料中…（${rangeText}）\n模式：BUY-only（SELL 事件不納入比較）`;
+  setStatus(buyMsg, { spinning: true });
+  setAccordionStatusText(buyMsg);
   await setDateRangeInput(BUY_INPUT_ID, rangeText);
 
   // Persist BEFORE submitting because submit triggers a full reload (execution stops).
@@ -483,6 +490,7 @@ async function resumeIfNeeded(): Promise<boolean> {
   // previous versions (sell stages), reset it to avoid confusing auto-resume loops.
   if (state.stage !== 'buy_submitted' && state.stage !== 'computing') {
     await clearRunState();
+    setAccordionStatusText('已重置舊版狀態，請重新點擊按鈕開始（BUY-only）');
     setStatusDone('已重置舊版狀態，請重新點擊按鈕開始（BUY-only）');
     return true;
   }
@@ -491,7 +499,9 @@ async function resumeIfNeeded(): Promise<boolean> {
   if (state.stage === 'buy_submitted') {
     const y = state.cursorYear;
     const rangeText = state.rangeText ?? yearRangeText(y);
-    setStatus(`解析買入資料中…（${rangeText}）\n模式：BUY-only（SELL 事件不納入比較）`, { spinning: true });
+    const parseMsg = `解析買入資料中…（${rangeText}）\n模式：BUY-only（SELL 事件不納入比較）`;
+    setStatus(parseMsg, { spinning: true });
+    setAccordionStatusText(parseMsg);
 
     const res = await waitForTableOrNoData(BUY_TABLE_SELECTOR, rangeText, {
       inputIdForEmptyCheck: BUY_INPUT_ID
@@ -509,7 +519,9 @@ async function resumeIfNeeded(): Promise<boolean> {
     if (y < state.endYear) {
       const nextYear = y + 1;
       const nextRange = yearRangeText(nextYear);
-      setStatus(`抓取買入資料中…（${nextRange}）\n模式：BUY-only（SELL 事件不納入比較）`, { spinning: true });
+      const nextMsg = `抓取買入資料中…（${nextRange}）\n模式：BUY-only（SELL 事件不納入比較）`;
+      setStatus(nextMsg, { spinning: true });
+      setAccordionStatusText(nextMsg);
       await setDateRangeInput(BUY_INPUT_ID, nextRange);
       await saveRunState({ ...state, stage: 'buy_submitted', cursorYear: nextYear, rangeText: nextRange, buyEvents: merged });
       triggerSubmitForm();
@@ -525,7 +537,9 @@ async function resumeIfNeeded(): Promise<boolean> {
     await setBuyEvents(state.startYear, state.endYear, events);
 
     await saveRunState({ ...state, stage: 'computing', buyEvents: merged });
-    setStatus('計算與產生圖表中…\n模式：BUY-only（SELL 事件不納入比較）', { spinning: true });
+    const computeMsg = '計算與產生圖表中…\n模式：BUY-only（SELL 事件不納入比較）';
+    setStatus(computeMsg, { spinning: true });
+    setAccordionStatusText(computeMsg);
     await computeAndRender(events);
     await clearRunState();
     setStatusDone('已完成');
@@ -534,6 +548,7 @@ async function resumeIfNeeded(): Promise<boolean> {
 
   if (state.stage === 'computing') {
     // If we ever reload mid-compute, allow user to re-run from scratch.
+    setAccordionStatusText('上次執行停在計算階段，請重新點擊按鈕再跑一次。');
     setStatus('上次執行停在計算階段，請重新點擊按鈕再跑一次。', { spinning: false });
     return true;
   }
@@ -554,8 +569,10 @@ async function runOnAccordionExpand(body: HTMLDivElement): Promise<void> {
       cached.startYear === startYear &&
       cached.endYear === endYear;
     if (cacheHit) {
-      setStatus('使用快取買入資料，計算與產生圖表中…', { spinning: true });
-      await computeAndRender(cached.events);
+      const cacheMsg = '使用快取買入資料，計算與產生圖表中…';
+      setStatus(cacheMsg, { spinning: true });
+      setAccordionStatusText(cacheMsg);
+        await computeAndRender(cached.events);
       setStatusDone('已完成');
     } else {
       await clearRunState();
@@ -563,7 +580,9 @@ async function runOnAccordionExpand(body: HTMLDivElement): Promise<void> {
     }
   } catch (e) {
     showError(e);
-    setStatusError(`產生失敗：${e instanceof Error ? e.message : String(e)}`);
+    const errMsg = `產生失敗：${e instanceof Error ? e.message : String(e)}`;
+    setAccordionStatusError(errMsg);
+    setStatusError(errMsg);
   } finally {
     setAccordionBodyLoading(false);
     setChartBlockParent(null);
@@ -584,6 +603,12 @@ function initBuyPage(): void {
     if (!open) return;
     loadRunState().then((s) => {
       if (s && (s.stage === 'buy_submitted' || s.stage === 'computing')) return;
+      const wrapper = document.getElementById(WRAPPER_ID);
+      const alreadyRendered =
+        wrapper?.parentElement?.id === 'pvs-accordion-body' &&
+        cachedEvents != null &&
+        cachedByTicker != null;
+      if (alreadyRendered) return;
       runOnAccordionExpand(body);
     });
   });
@@ -592,6 +617,7 @@ function initBuyPage(): void {
     if (!state || state.v !== 1) return;
     if (state.stage !== 'buy_submitted' && state.stage !== 'computing') return;
     setStatus('資料處理中…', { spinning: true });
+    setAccordionStatusText('資料處理中…');
     openAccordion(true);
     setAccordionBodyLoading(true);
     setChartBlockParent(body);
@@ -600,7 +626,9 @@ function initBuyPage(): void {
       if (didResume) setStatusDone('已完成');
     } catch (e) {
       console.error(e);
-      setStatusError(`resumeIfNeeded-產生失敗：${e instanceof Error ? e.message : String(e)}（已重置狀態）`);
+      const resumeErr = `resumeIfNeeded-產生失敗：${e instanceof Error ? e.message : String(e)}（已重置狀態）`;
+      setAccordionStatusError(resumeErr);
+      setStatusError(resumeErr);
       clearRunState().catch((err) => console.error(err));
     } finally {
       setAccordionBodyLoading(false);
@@ -614,10 +642,15 @@ initBuyPage();
 // Manual stop/reset: clears persisted state so refresh won't resume.
 window.addEventListener(getStopEventName(), () => {
   clearRunState()
-    .then(() => setStatusDone('已停止（狀態已重置）'))
+    .then(() => {
+      setAccordionStatusText('已停止（狀態已重置）');
+      setStatusDone('已停止（狀態已重置）');
+    })
     .catch((e) => {
       console.error(e);
-      setStatusError(`停止失敗：${e instanceof Error ? e.message : String(e)}`);
+      const stopErr = `停止失敗：${e instanceof Error ? e.message : String(e)}`;
+      setAccordionStatusError(stopErr);
+      setStatusError(stopErr);
     });
 });
 
