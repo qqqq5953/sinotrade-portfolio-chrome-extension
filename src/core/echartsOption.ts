@@ -158,7 +158,7 @@ export function buildEchartsOption(
     },
     grid: {
       left: '0%',
-      right: '0%',
+      right: '1%',
       bottom: '3%',
       containLabel: true
     },
@@ -193,6 +193,8 @@ export function buildEchartsOption(
         name: valueMode === 'excess' ? 'excess vs VTI' : 'portfolio',
         type: 'line',
         showSymbol: false,
+        symbolSize: 10,
+        clip: false,
         lineStyle: { color: '#c43826' },
         itemStyle: { color: '#c43826' },
         data: portfolioData
@@ -201,6 +203,8 @@ export function buildEchartsOption(
         name: valueMode === 'excess' ? 'baseline' : 'vti',
         type: 'line',
         showSymbol: false,
+        symbolSize: 10,
+        clip: false,
         lineStyle: { color: '#3f5372' },
         itemStyle: { color: '#3f5372' },
         data: vtiData
