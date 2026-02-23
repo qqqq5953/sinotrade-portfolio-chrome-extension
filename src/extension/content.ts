@@ -28,7 +28,7 @@ import {
   openAccordion,
   setAccordionExpandCallback,
   renderChartRules,
-  renderDebugTable,
+  setDailyDetailDataProvider,
   renderPriceFetchReport,
   renderPriceModeToggle,
   renderValueModeToggle,
@@ -328,14 +328,6 @@ function recomputeAndRender(): void {
   renderChartWithCurrentView(computed);
 
   const { closeByTicker, adjByTicker } = buildCloseAdjMaps();
-  renderDebugTable(computed.debugRows, {
-    mode: priceMode,
-    closeSeriesByTicker: closeByTicker,
-    adjSeriesByTicker: adjByTicker,
-    anchorTicker: 'VTI',
-    ...(cachedFetchReport ? { fetchReport: cachedFetchReport } : {})
-  });
-
   if (cachedFetchReport) renderPriceFetchReport(cachedFetchReport);
   renderChartRules();
 }
@@ -629,6 +621,17 @@ function initBuyPage(): void {
       if (alreadyRendered) return;
       runOnAccordionExpand(body);
     });
+  });
+  setDailyDetailDataProvider(() => {
+    if (!cachedComputed || !cachedByTicker) return null;
+    const { closeByTicker, adjByTicker } = buildCloseAdjMaps();
+    return {
+      rows: cachedComputed.debugRows,
+      mode: priceMode,
+      closeSeriesByTicker: closeByTicker,
+      adjSeriesByTicker: adjByTicker,
+      anchorTicker: 'VTI'
+    };
   });
 
   loadRunState().then(async (state) => {

@@ -17,9 +17,12 @@ const FETCH_STATUS_ICON_ID = 'pvs-fetch-status-icon';
 
 const RULES_DETAILS_ID = 'pvs-rules-details';
 const FETCH_DETAILS_ID = 'pvs-fetch-details';
-const DEBUG_DETAILS_ID = 'pvs-debug-details';
 
-const BLOCK_ORDER = [TOGGLE_ID, 'chart', RULES_DETAILS_ID, FETCH_DETAILS_ID, DEBUG_DETAILS_ID] as const;
+const BLOCK_ORDER = [TOGGLE_ID, 'chart', RULES_DETAILS_ID, FETCH_DETAILS_ID] as const;
+
+const MODAL_OVERLAY_ID = 'pvs-daily-detail-modal-overlay';
+const MODAL_PANEL_ID = 'pvs-daily-detail-modal-panel';
+const DAILY_DETAIL_BTN_ID = 'pvs-daily-detail-btn';
 
 /** When set (e.g. accordion body), chart block is inserted here instead of TagSelectArea. */
 let chartBlockParent: HTMLElement | null = null;
@@ -144,6 +147,18 @@ function ensureStyle(): void {
 #${ACCORDION_ID} .pvs-accordion-title-row {
     display: flex;
     align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    width: 100%;
+}
+#${ACCORDION_ID} .pvs-accordion-title-left {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+#${ACCORDION_ID} .pvs-accordion-title-right {
+    display: flex;
+    align-items: center;
     gap: 6px;
 }
 #${ACCORDION_ID} .${FETCH_STATUS_ICON_ID} {
@@ -191,6 +206,48 @@ function ensureStyle(): void {
     gap: 8px;
     padding: 8px 0px;
 }
+.pvs-chart-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 10px 12px;
+    flex-wrap: wrap;
+}
+.pvs-chart-section-header .pvs-header-buttons {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+#${ACCORDION_ID} .${FETCH_STATUS_ICON_ID},
+#${ACCORDION_ID} .pvs-header-icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border-radius: 4px;
+    cursor: pointer;
+    color: ${PRIMARY_COLOR};
+    flex-shrink: 0;
+    border: none;
+    background: transparent;
+}
+#${ACCORDION_ID} .${FETCH_STATUS_ICON_ID}:hover,
+#${ACCORDION_ID} .pvs-header-icon-btn:hover {
+    background: #f5f6f8;
+}
+#${ACCORDION_ID} .${FETCH_STATUS_ICON_ID}.pvs-fetch-error {
+    color: #c43826;
+    border-color: #c43826;
+}
+#${ACCORDION_ID} .${FETCH_STATUS_ICON_ID} svg,
+#${ACCORDION_ID} .pvs-header-icon-btn svg {
+    width: 14px;
+    height: 14px;
+    stroke: currentColor;
+}
 #${ACCORDION_ID} {
     border: 1px solid #d9dde3;
     border-radius: 8px;
@@ -232,6 +289,74 @@ function ensureStyle(): void {
 }
 #${ACCORDION_STATUS_ID}.pvs-status-error {
     color: #991b1b;
+}
+#${MODAL_OVERLAY_ID} {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.4);
+    z-index: 999999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    box-sizing: border-box;
+}
+#${MODAL_PANEL_ID} {
+    background: #fff;
+    border-radius: 8px;
+    max-width: 96vw;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1);
+}
+#${MODAL_PANEL_ID} .pvs-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid #e5e7eb;
+    flex-shrink: 0;
+    font-weight: 700;
+    color: ${PRIMARY_COLOR};
+}
+#${MODAL_PANEL_ID} .pvs-modal-close {
+    width: 32px;
+    height: 32px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    border-radius: 4px;
+    color: #6b7280;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+#${MODAL_PANEL_ID} .pvs-modal-close:hover {
+    background: #f3f4f6;
+    color: #111827;
+}
+#${MODAL_PANEL_ID} .pvs-modal-body {
+    overflow: auto;
+    padding: 0;
+    flex: 1;
+    min-height: 0;
+}
+#${RULES_ID} {
+    border: 1px solid #e5e7eb;
+    border-radius: 4px;
+    background: #fff;
+    padding: 8px 10px;
+    color: ${PRIMARY_COLOR};
+    font-size: 12px;
+}
+#${RULES_ID} ul {
+    margin: 0;
+    padding-left: 18px;
+}
+#${RULES_ID} li + li {
+    margin-top: 2px;
 }
 `;
     document.head.appendChild(style);
@@ -276,6 +401,20 @@ function orderWrapperChildren(wrapper: HTMLElement): void {
 
 export type AccordionRef = { details: HTMLDetailsElement; body: HTMLDivElement };
 
+let dailyDetailDataProvider: (() => DailyDetailData | null) | null = null;
+
+export type DailyDetailData = {
+  rows: DebugDayRow[];
+  mode: PriceMode;
+  closeSeriesByTicker: Map<string, PriceSeries>;
+  adjSeriesByTicker: Map<string, PriceSeries>;
+  anchorTicker?: string;
+};
+
+export function setDailyDetailDataProvider(provider: () => DailyDetailData | null): void {
+  dailyDetailDataProvider = provider;
+}
+
 export function mountAccordion(opts?: { onUpdate?: () => void }): AccordionRef {
     ensureStyle();
     const tagArea = getTagArea();
@@ -294,18 +433,41 @@ export function mountAccordion(opts?: { onUpdate?: () => void }): AccordionRef {
     summary.style.gap = '8px';
     const titleRow = document.createElement('div');
     titleRow.className = 'pvs-accordion-title-row';
+    const leftGroup = document.createElement('div');
+    leftGroup.className = 'pvs-accordion-title-left';
     const title = document.createElement('span');
     title.textContent = '圖表與分析';
-    titleRow.appendChild(title);
+    leftGroup.appendChild(title);
     const statusIcon = document.createElement('button');
     statusIcon.type = 'button';
     statusIcon.id = FETCH_STATUS_ICON_ID;
     statusIcon.className = FETCH_STATUS_ICON_ID;
     statusIcon.setAttribute('aria-label', '抓價報告');
+    statusIcon.title = '抓價報告';
     statusIcon.style.display = 'none';
     statusIcon.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y1="13"/><line x1="16" y1="17" x2="8" y1="17"/><line x1="10" y1="9" x2="8" y1="9"/></svg>`;
-    titleRow.appendChild(statusIcon);
-    summary.appendChild(titleRow);
+    leftGroup.appendChild(statusIcon);
+    const dailyDetailBtn = document.createElement('button');
+    dailyDetailBtn.type = 'button';
+    dailyDetailBtn.id = DAILY_DETAIL_BTN_ID;
+    dailyDetailBtn.className = 'pvs-header-icon-btn';
+    dailyDetailBtn.setAttribute('aria-label', '每日明細');
+    dailyDetailBtn.title = '每日明細：查看每個交易日的持倉、市值與計算依據';
+    dailyDetailBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>`;
+    dailyDetailBtn.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const data = dailyDetailDataProvider?.() ?? null;
+      if (!data) {
+        alert('請先完成計算後再查看每日明細。');
+        return;
+      }
+      openDailyDetailModal(data);
+    };
+    leftGroup.appendChild(dailyDetailBtn);
+    titleRow.appendChild(leftGroup);
+    const rightGroup = document.createElement('div');
+    rightGroup.className = 'pvs-accordion-title-right';
     if (opts?.onUpdate) {
         const updateBtn = document.createElement('button');
         updateBtn.type = 'button';
@@ -319,12 +481,14 @@ export function mountAccordion(opts?: { onUpdate?: () => void }): AccordionRef {
         updateBtn.style.background = '#fff';
         updateBtn.style.color = PRIMARY_COLOR;
         updateBtn.onclick = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        opts.onUpdate!();
+          e.preventDefault();
+          e.stopPropagation();
+          opts.onUpdate!();
         };
-        summary.appendChild(updateBtn);
+        rightGroup.appendChild(updateBtn);
     }
+    titleRow.appendChild(rightGroup);
+    summary.appendChild(titleRow);
     details.appendChild(summary);
     const body = document.createElement('div');
     body.id = ACCORDION_BODY_ID;
@@ -440,10 +604,131 @@ function ensureDetailsInWrapper(
     return content;
 }
 
-function ensureContainerAfterChart(): HTMLDivElement {
+function buildDailyDetailTableHTML(data: DailyDetailData): string {
+    const opts = data;
+    const rows = data.rows;
+    const anchorTicker = opts.anchorTicker ?? 'VTI';
+    const modeLabel = opts.mode === 'close' ? '收盤價' : '調整後收盤價';
+    const noteItems = [
+        `目前市值計算標準：${modeLabel}`,
+        '比較規則：BUY-only（SELL 不納入比較）',
+        '拆股還原規則：僅套用 splitDate > tradeDate（同日不套用）',
+        '若價格有回補，會標示使用的實際日期',
+    ];
+    return `
+        <div class="summary-body">
+            <div class="subhdr">
+            <ul>${noteItems.map((x) => `<li>${x}</li>`).join('')}</ul>
+            </div>
+            <div style="overflow:auto; max-height: 70vh;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>事件日期</th>
+                        <th>實際計算日期</th>
+                        <th>日期校正</th>
+                        <th>當日事件</th>
+                        <th>拆股還原</th>
+                        <th>當日現金流</th>
+                        <th>${anchorTicker} 股數變化</th>
+                        <th>持倉（事件後）</th>
+                        <th>標的價格（收盤 & 還原）</th>
+                        <th>${anchorTicker} 價格（收盤 & 還原）</th>
+                        <th>投資組合市值</th>
+                        <th>${anchorTicker} 持有股數</th>
+                        <th>${anchorTicker} 市值</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rows
+                        .map((r) => {
+                            const usedVtiIso = r.vtiPriceUsed.usedIsoDateET;
+                            const vtiClose = lookup(opts.closeSeriesByTicker.get(anchorTicker), usedVtiIso);
+                            const vtiAdj = lookup(opts.adjSeriesByTicker.get(anchorTicker), usedVtiIso);
+                            const vtiPrice = [
+                                `•\u00A0close=${vtiClose == null ? '—' : fmt(vtiClose)}`,
+                                `•\u00A0adj=${vtiAdj == null ? '—' : fmt(vtiAdj)}`,
+                                r.vtiPriceUsed.backfilled ? `•\u00A0回補日期：${usedVtiIso}` : ''
+                            ]
+                                .filter((x) => x.length > 0)
+                                .join('\n');
+                            const priceLines = r.portfolioPricesUsed
+                                .map((p) => {
+                                    const iso = p.usedIsoDateET;
+                                    const c = lookup(opts.closeSeriesByTicker.get(p.ticker), iso);
+                                    const a = lookup(opts.adjSeriesByTicker.get(p.ticker), iso);
+                                    return [
+                                        `${p.ticker}`,
+                                        `•\u00A0close=${c == null ? '—' : fmt(c)}`,
+                                        `•\u00A0adj=${a == null ? '—' : fmt(a)}`,
+                                        p.backfilled ? `•\u00A0回補日期：${iso}` : ''
+                                    ]
+                                        .filter((x) => x.length > 0)
+                                        .join('\n');
+                                })
+                                .join('\n');
+                            return `
+                                <tr>
+                                <td class="mono">${r.dayKeyIsoDateET}</td>
+                                <td class="mono">${r.resolvedIsoDateET}</td>
+                                <td>${r.anchorShifted ? '<span class="tag">shifted</span>' : ''}</td>
+                                <td class="mono">${eventSummary(r)}</td>
+                                <td class="mono">${splitAdjSummary(r)}</td>
+                                <td class="mono">${fmt(r.dayCashTotal)}</td>
+                                <td class="mono">${fmt(r.vtiDeltaSharesTotal)}</td>
+                                <td class="mono">${holdingsSummary(r)}</td>
+                                <td class="mono">${priceLines || '(no holdings)'}</td>
+                                <td class="mono">${vtiPrice}</td>
+                                <td class="mono">${fmt(r.portfolioValue)}</td>
+                                <td class="mono">${fmt(r.vtiShares)}</td>
+                                <td class="mono">${fmt(r.vtiValue)}</td>
+                                </tr>
+                            `;
+                        })
+                        .join('')}
+                </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+}
+
+export function openDailyDetailModal(data: DailyDetailData): void {
     ensureStyle();
-    const wrapper = ensurePvsWrapper();
-    return ensureDetailsInWrapper(wrapper, DEBUG_DETAILS_ID, '進階資料檢查（Debug）', TABLE_ID);
+    const existing = document.getElementById(MODAL_OVERLAY_ID);
+    if (existing) return;
+    const overlay = document.createElement('div');
+    overlay.id = MODAL_OVERLAY_ID;
+    const panel = document.createElement('div');
+    panel.id = MODAL_PANEL_ID;
+    const header = document.createElement('div');
+    header.className = 'pvs-modal-header';
+    const titleSpan = document.createElement('span');
+    titleSpan.textContent = '每日明細';
+    header.appendChild(titleSpan);
+    const closeBtn = document.createElement('button');
+    closeBtn.type = 'button';
+    closeBtn.className = 'pvs-modal-close';
+    closeBtn.setAttribute('aria-label', '關閉');
+    closeBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+    const body = document.createElement('div');
+    body.className = 'pvs-modal-body';
+    const tableWrapper = document.createElement('div');
+    tableWrapper.id = TABLE_ID;
+    tableWrapper.innerHTML = buildDailyDetailTableHTML(data);
+    body.appendChild(tableWrapper);
+    panel.appendChild(header);
+    header.appendChild(closeBtn);
+    panel.appendChild(body);
+    overlay.appendChild(panel);
+    function close(): void {
+        overlay.remove();
+    }
+    overlay.onclick = (e) => {
+        if (e.target === overlay) close();
+    };
+    closeBtn.onclick = close;
+    document.body.appendChild(overlay);
 }
 
 function ensureToggleBeforeChart(): HTMLDivElement {
@@ -640,120 +925,6 @@ export function renderChartRules(): void {
     '若價格有回補，會標示使用的實際日期'
     ];
     div.innerHTML = `<ul>${items.map((x) => `<li>${x}</li>`).join('')}</ul>`;
-}
-
-export function renderDebugTable(
-    rows: DebugDayRow[],
-    opts: {
-        mode: PriceMode;
-        closeSeriesByTicker: Map<string, PriceSeries>;
-        adjSeriesByTicker: Map<string, PriceSeries>;
-        anchorTicker?: string;
-        fetchReport?: {
-            startedAt: number;
-            finishedAt?: number;
-            failedTickers: { ticker: string; reason: string }[];
-            logs: {
-            ticker: string;
-            year: number;
-            endYear?: number;
-            attempt: number;
-            maxAttempts: number;
-            outcome: 'ok' | 'retry' | 'fail';
-            error?: { kind: string; message: string; status?: number; url?: string };
-            }[];
-        };
-    }
-): void {
-    const div = ensureContainerAfterChart();
-    const anchorTicker = opts.anchorTicker ?? 'VTI';
-    const modeLabel = opts.mode === 'close' ? '收盤價' : '調整後收盤價';
-    const noteItems = [
-    `目前市值計算標準：${modeLabel}`,
-    '比較規則：BUY-only（SELL 不納入比較）',
-    '拆股還原規則：僅套用 splitDate > tradeDate（同日不套用）',
-    '若價格有回補，會標示使用的實際日期',
-    ];
-
-    const html = `
-        <div class="summary-body">
-            <div class="subhdr">
-            <ul>${noteItems.map((x) => `<li>${x}</li>`).join('')}</ul>
-            </div>
-            <div style="overflow:auto; max-height: 520px;">
-            <table>
-                <thead>
-                    <tr>
-                        <th>事件日期</th>
-                        <th>實際計算日期</th>
-                        <th>日期校正</th>
-                        <th>當日事件</th>
-                        <th>拆股還原</th>
-                        <th>當日現金流</th>
-                        <th>${anchorTicker} 股數變化</th>
-                        <th>持倉（事件後）</th>
-                        <th>標的價格（收盤 & 還原）</th>
-                        <th>${anchorTicker} 價格（收盤 & 還原）</th>
-                        <th>投資組合市值</th>
-                        <th>${anchorTicker} 持有股數</th>
-                        <th>${anchorTicker} 市值</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${rows
-                        .map((r) => {
-                            const usedVtiIso = r.vtiPriceUsed.usedIsoDateET;
-                            const vtiClose = lookup(opts.closeSeriesByTicker.get(anchorTicker), usedVtiIso);
-                            const vtiAdj = lookup(opts.adjSeriesByTicker.get(anchorTicker), usedVtiIso);
-                            const vtiPrice = [
-                                `•\u00A0close=${vtiClose == null ? '—' : fmt(vtiClose)}`,
-                                `•\u00A0adj=${vtiAdj == null ? '—' : fmt(vtiAdj)}`,
-                                r.vtiPriceUsed.backfilled ? `•\u00A0回補日期：${usedVtiIso}` : ''
-                            ]
-                                .filter((x) => x.length > 0)
-                                .join('\n');
-
-                            const priceLines = r.portfolioPricesUsed
-                                .map((p) => {
-                                const iso = p.usedIsoDateET;
-                                const c = lookup(opts.closeSeriesByTicker.get(p.ticker), iso);
-                                const a = lookup(opts.adjSeriesByTicker.get(p.ticker), iso);
-                                return [
-                                    `${p.ticker}`,
-                                    `•\u00A0close=${c == null ? '—' : fmt(c)}`,
-                                    `•\u00A0adj=${a == null ? '—' : fmt(a)}`,
-                                    p.backfilled ? `•\u00A0回補日期：${iso}` : ''
-                                ]
-                                    .filter((x) => x.length > 0)
-                                    .join('\n');
-                                })
-                                .join('\n');
-                            return `
-                                <tr>
-                                <td class="mono">${r.dayKeyIsoDateET}</td>
-                                <td class="mono">${r.resolvedIsoDateET}</td>
-                                <td>${r.anchorShifted ? '<span class="tag">shifted</span>' : ''}</td>
-                                <td class="mono">${eventSummary(r)}</td>
-                                <td class="mono">${splitAdjSummary(r)}</td>
-                                <td class="mono">${fmt(r.dayCashTotal)}</td>
-                                <td class="mono">${fmt(r.vtiDeltaSharesTotal)}</td>
-                                <td class="mono">${holdingsSummary(r)}</td>
-                                <td class="mono">${priceLines || '(no holdings)'}</td>
-                                <td class="mono">${vtiPrice}</td>
-                                <td class="mono">${fmt(r.portfolioValue)}</td>
-                                <td class="mono">${fmt(r.vtiShares)}</td>
-                                <td class="mono">${fmt(r.vtiValue)}</td>
-                                </tr>
-                            `;
-                        })
-                        .join('')}
-                </tbody>
-                </table>
-            </div>
-        </div>
-    `;
-
-    div.innerHTML = html;
 }
 
 export function renderPriceFetchReport(report: {
