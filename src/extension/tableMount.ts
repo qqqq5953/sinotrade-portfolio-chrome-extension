@@ -134,6 +134,19 @@ function ensureStyle(): void {
     font-size: 12px;
     color: #6b7280;
 }
+#${TOGGLE_ID} .pvs-hint-info {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: help;
+    color: #6b7280;
+    flex-shrink: 0;
+    padding: 8px;
+}
+#${TOGGLE_ID} .pvs-hint-info svg {
+    width: 14px;
+    height: 14px;
+}
 #${FETCH_ID} .fetch-report-headline {
     padding: 10px 24px 0;
     font-size: 12px;
@@ -205,19 +218,6 @@ function ensureStyle(): void {
     flex-direction: column;
     gap: 8px;
     padding: 8px 0px;
-}
-.pvs-chart-section-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    padding: 10px 12px;
-    flex-wrap: wrap;
-}
-.pvs-chart-section-header .pvs-header-buttons {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
 }
 #${ACCORDION_ID} .${FETCH_STATUS_ICON_ID},
 #${ACCORDION_ID} .pvs-header-icon-btn {
@@ -750,13 +750,13 @@ function ensureToggleBeforeChart(): HTMLDivElement {
 function ensureToggleRows(): {
   root: HTMLDivElement;
   valueRow: HTMLDivElement;
-  timeRangeRow: HTMLDivElement;
   priceRow: HTMLDivElement;
+  timeRangeRow: HTMLDivElement;
 } {
   const root = ensureToggleBeforeChart();
   let valueRow = root.querySelector<HTMLDivElement>('div[data-row="value"]') ?? null;
-  let timeRangeRow = root.querySelector<HTMLDivElement>('div[data-row="timerange"]') ?? null;
   let priceRow = root.querySelector<HTMLDivElement>('div[data-row="price"]') ?? null;
+  let timeRangeRow = root.querySelector<HTMLDivElement>('div[data-row="timerange"]') ?? null;
 
   if (!valueRow) {
     valueRow = document.createElement('div');
@@ -764,25 +764,25 @@ function ensureToggleRows(): {
     valueRow.setAttribute('data-row', 'value');
     root.appendChild(valueRow);
   }
-  if (!timeRangeRow) {
-    timeRangeRow = document.createElement('div');
-    timeRangeRow.className = 'row';
-    timeRangeRow.setAttribute('data-row', 'timerange');
-    root.appendChild(timeRangeRow);
-  }
   if (!priceRow) {
     priceRow = document.createElement('div');
     priceRow.className = 'row';
     priceRow.setAttribute('data-row', 'price');
     root.appendChild(priceRow);
   }
+  if (!timeRangeRow) {
+    timeRangeRow = document.createElement('div');
+    timeRangeRow.className = 'row';
+    timeRangeRow.setAttribute('data-row', 'timerange');
+    root.appendChild(timeRangeRow);
+  }
 
-  // Enforce order: value row, then time range row, then price row.
+  // Enforce order: value row => price row => time range row.
   if (root.firstChild !== valueRow) root.insertBefore(valueRow, root.firstChild);
-  if (valueRow.nextSibling !== timeRangeRow) root.insertBefore(timeRangeRow, valueRow.nextSibling);
-  if (timeRangeRow.nextSibling !== priceRow) root.insertBefore(priceRow, timeRangeRow.nextSibling);
+  if (valueRow.nextSibling !== priceRow) root.insertBefore(priceRow, valueRow.nextSibling);
+  if (priceRow.nextSibling !== timeRangeRow) root.insertBefore(timeRangeRow, priceRow.nextSibling);
 
-  return { root, valueRow, timeRangeRow, priceRow };
+  return { root, valueRow, priceRow, timeRangeRow };
 }
 
 function ensureFetchReportAfterToggle(): HTMLDivElement {
@@ -850,7 +850,7 @@ export function renderPriceModeToggle(mode: PriceMode, onChange: (mode: PriceMod
             <button class="btn ${mode === 'adjclose' ? 'active' : ''}" data-mode="adjclose" type="button">調整後收盤價</button>
             <button class="btn ${mode === 'close' ? 'active' : ''}" data-mode="close" type="button">收盤價</button>
         </div>
-        <span class="hint">市值計算標準</span>
+        <div class="pvs-hint-info" title="市值計算標準" aria-label="說明"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg></div>
     `;
     priceRow.querySelectorAll<HTMLButtonElement>('button[data-mode]').forEach((b) => {
         b.onclick = () => {
@@ -861,15 +861,22 @@ export function renderPriceModeToggle(mode: PriceMode, onChange: (mode: PriceMod
     });
 }
 
+const VALUE_MODE_TOOLTIPS: Record<ValueMode, string> = {
+  amount: '投資組合與 VTI 組合的市值',
+  percent: '投資組合與 VTI 組合的累積報酬率 = (市值 / 累積投入金額 - 1) × 100%',
+  excess: '投資組合相對 VTI 組合的超額績效 = (投資組合市值 / VTI 組合市值 - 1) × 100%',
+};
+
 export function renderValueModeToggle(mode: ValueMode, onChange: (mode: ValueMode) => void): void {
     const { valueRow } = ensureToggleRows();
+    const tooltip = VALUE_MODE_TOOLTIPS[mode];
     valueRow.innerHTML = `
         <div class="btn-group">
             <button class="btn" data-vmode="excess" type="button" title="超額績效% = (投資組合市值 / VTI 市值 - 1) × 100%（相對 VTI 的超額績效%）">超額績效%</button>
             <button class="btn" data-vmode="percent" type="button" title="累積報酬率% = (市值 / 累積投入金額 - 1) × 100%（投資組合與 VTI 皆以各自市值計）">累積報酬率%</button>
             <button class="btn" data-vmode="amount" type="button" title="顯示投資組合與 VTI 的市值（金額）">市值</button>
         </div>
-        <span class="hint" data-vdesc="1"></span>
+        <div class="pvs-hint-info" title="${tooltip.replace(/"/g, '&quot;')}" aria-label="說明"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg></div>
     `;
 
     valueRow.querySelectorAll<HTMLButtonElement>('button[data-vmode]').forEach((b) => {
@@ -878,16 +885,6 @@ export function renderValueModeToggle(mode: ValueMode, onChange: (mode: ValueMod
         b.classList.toggle('active', m === mode);
         b.onclick = () => onChange(m);
     });
-
-    const desc = valueRow.querySelector('span[data-vdesc="1"]') as HTMLSpanElement | null;
-    if (desc) {
-    desc.textContent =
-        mode === 'amount'
-        ? '投資組合與 VTI 組合的市值'
-        : mode === 'percent'
-            ? '投資組合與 VTI 組合的累積報酬率 = (市值 / 累積投入金額 - 1) × 100%'
-            : '投資組合相對 VTI 組合的超額績效 = (投資組合市值 / VTI 組合市值 - 1) × 100%';
-    }
 }
 
 const TIME_RANGE_OPTIONS: { value: ChartTimeRange; label: string }[] = [
@@ -908,7 +905,6 @@ export function renderTimeRangeButtons(range: ChartTimeRange, onChange: (range: 
           `<button class="btn ${range === o.value ? 'active' : ''}" data-timerange="${o.value}" type="button" title="圖表顯示區間">${o.label}</button>`
       ).join('')}
     </div>
-    <span class="hint">圖表時間區間</span>
   `;
   timeRangeRow.querySelectorAll<HTMLButtonElement>('button[data-timerange]').forEach((b) => {
     const r = b.getAttribute('data-timerange') as ChartTimeRange | null;
