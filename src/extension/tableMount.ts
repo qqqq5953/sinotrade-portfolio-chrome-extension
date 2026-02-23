@@ -581,7 +581,7 @@ export function renderValueModeToggle(mode: ValueMode, onChange: (mode: ValueMod
     valueRow.innerHTML = `
         <div class="btn-group">
             <button class="btn" data-vmode="excess" type="button" title="超額績效% = (投資組合市值 / VTI 市值 - 1) × 100%（相對 VTI 的超額績效%）">超額績效%</button>
-            <button class="btn" data-vmode="percent" type="button" title="投入報酬率% = (市值 / 累積投入金額 - 1) × 100%（投資組合與 VTI 皆以各自市值計）">投入報酬率%</button>
+            <button class="btn" data-vmode="percent" type="button" title="累積報酬率% = (市值 / 累積投入金額 - 1) × 100%（投資組合與 VTI 皆以各自市值計）">累積報酬率%</button>
             <button class="btn" data-vmode="amount" type="button" title="顯示投資組合與 VTI 的市值（金額）">市值</button>
         </div>
         <span class="hint" data-vdesc="1"></span>
@@ -598,10 +598,10 @@ export function renderValueModeToggle(mode: ValueMode, onChange: (mode: ValueMod
     if (desc) {
     desc.textContent =
         mode === 'amount'
-        ? '說明：顯示投資組合與 VTI 的市值（金額）'
+        ? '投資組合與 VTI 組合的市值'
         : mode === 'percent'
-            ? '說明：投入報酬率% = (市值 / 累積投入金額 - 1) × 100%（投資組合與 VTI 皆以各自市值計）'
-            : '說明：超額績效% = (投資組合市值 / VTI 市值 - 1) × 100%（相對 VTI 的超額績效%）';
+            ? '投資組合與 VTI 組合的累積報酬率 = (市值 / 累積投入金額 - 1) × 100%'
+            : '投資組合相對 VTI 組合的超額績效 = (投資組合市值 / VTI 組合市值 - 1) × 100%';
     }
 }
 
@@ -623,7 +623,7 @@ export function renderTimeRangeButtons(range: ChartTimeRange, onChange: (range: 
           `<button class="btn ${range === o.value ? 'active' : ''}" data-timerange="${o.value}" type="button" title="圖表顯示區間">${o.label}</button>`
       ).join('')}
     </div>
-    <span class="hint">圖表時間區間（1m/6m/YTD/1y/3y/max）</span>
+    <span class="hint">圖表時間區間</span>
   `;
   timeRangeRow.querySelectorAll<HTMLButtonElement>('button[data-timerange]').forEach((b) => {
     const r = b.getAttribute('data-timerange') as ChartTimeRange | null;
