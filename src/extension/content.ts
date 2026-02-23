@@ -3,6 +3,7 @@ import {
   normalizeBuyEventsBySplits,
   parseYahooChartToPriceSeriesPair,
   parseYahooChartSplits,
+  type ComputedSeries,
   type YahooSplitEvent,
   type PriceSeries,
   type TradeEvent
@@ -31,10 +32,12 @@ import {
   renderPriceFetchReport,
   renderPriceModeToggle,
   renderValueModeToggle,
+  renderTimeRangeButtons,
   WRAPPER_ID,
   type PriceMode,
   type ValueMode
 } from './tableMount';
+import { getTimeRangeBounds, type ChartTimeRange } from './chartTimeRange';
 import {
   getBuyEvents,
   setBuyEvents,
@@ -74,8 +77,9 @@ type FetchedTickerData = DualSeries & { splits: YahooSplitEvent[] };
 
 let cachedEvents: TradeEvent[] | null = null;
 let cachedByTicker: Map<string, DualSeries> | null = null;
-let priceMode: PriceMode = 'close'; // default per user request
+let priceMode: PriceMode = 'adjclose'; // default per user request
 let valueMode: ValueMode = 'excess';
+let chartTimeRange: ChartTimeRange = 'max';
 let cachedComputed: ReturnType<typeof computePortfolioVsVtiSeriesWithDebug> | null = null;
 
 
@@ -301,6 +305,16 @@ function buildCloseAdjMaps(): { closeByTicker: Map<string, PriceSeries>; adjByTi
   return { closeByTicker, adjByTicker };
 }
 
+/** Renders the chart with current valueMode and chartTimeRange (no recompute). */
+function renderChartWithCurrentView(series: ComputedSeries): void {
+  const dates = series.resolvedIsoDatesET;
+  const range =
+    dates.length > 0
+      ? getTimeRangeBounds(chartTimeRange, dates[0]!, dates[dates.length - 1]!)
+      : undefined;
+  renderChart(series, { valueMode, range });
+}
+
 function recomputeAndRender(): void {
   if (!cachedEvents || !cachedByTicker) return;
   const priceSeriesByTicker = buildPriceSeriesByTicker(priceMode);
@@ -311,7 +325,7 @@ function recomputeAndRender(): void {
     anchorTicker: 'VTI'
   });
   cachedComputed = computed;
-  renderChart(computed, { valueMode });
+  renderChartWithCurrentView(computed);
 
   const { closeByTicker, adjByTicker } = buildCloseAdjMaps();
   renderDebugTable(computed.debugRows, {
@@ -323,15 +337,14 @@ function recomputeAndRender(): void {
   });
 
   if (cachedFetchReport) renderPriceFetchReport(cachedFetchReport);
-  // Keep chart rules stable after all blocks have potentially re-positioned.
   renderChartRules();
 }
 
-function rerenderChartOnly(): void {
+/** Updates chart + rules/fetch report with cached data (no recompute). Use after valueMode or chartTimeRange change. */
+function updateChartView(): void {
   if (!cachedComputed) return;
-  renderChart(cachedComputed, { valueMode });
+  renderChartWithCurrentView(cachedComputed);
   if (cachedFetchReport) renderPriceFetchReport(cachedFetchReport);
-  // Value mode toggles may move sibling blocks; re-anchor chart rules last.
   renderChartRules();
 }
 
@@ -346,8 +359,13 @@ function renderToggles(): void {
     if (valueMode === m) return;
     valueMode = m;
     renderToggles();
-    // Value mode is presentation-only; keep it fast.
-    rerenderChartOnly();
+    updateChartView();
+  });
+  renderTimeRangeButtons(chartTimeRange, (r) => {
+    if (chartTimeRange === r) return;
+    chartTimeRange = r;
+    renderToggles();
+    updateChartView();
   });
 }
 

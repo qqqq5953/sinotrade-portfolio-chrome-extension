@@ -1,5 +1,5 @@
 import * as echarts from 'echarts';
-import { buildEchartsOption, type ComputedSeries } from '../core';
+import { buildEchartsOption, type ComputedSeries, type ChartRangeOpt } from '../core';
 import { mustQuery } from './dom';
 import { WRAPPER_ID } from './tableMount';
 
@@ -28,9 +28,15 @@ function ensureChartContainer(): HTMLDivElement {
 
 export type ChartValueMode = 'percent' | 'excess' | 'amount';
 
-export function renderChart(series: ComputedSeries, opts?: { valueMode?: ChartValueMode }): void {
+export function renderChart(
+  series: ComputedSeries,
+  opts?: { valueMode?: ChartValueMode; range?: ChartRangeOpt }
+): void {
   const container = ensureChartContainer();
   const chart = echarts.init(container);
-  chart.setOption(buildEchartsOption(series, opts?.valueMode ? { valueMode: opts.valueMode } : undefined), { notMerge: true });
+  const buildOpts: { valueMode?: ChartValueMode; range?: ChartRangeOpt } = {};
+  if (opts?.valueMode) buildOpts.valueMode = opts.valueMode;
+  if (opts?.range) buildOpts.range = opts.range;
+  chart.setOption(buildEchartsOption(series, buildOpts), { notMerge: true });
 }
 

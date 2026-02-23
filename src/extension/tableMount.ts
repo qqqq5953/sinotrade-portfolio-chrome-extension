@@ -1,4 +1,5 @@
 import type { DebugDayRow, PriceSeries } from '../core';
+import type { ChartTimeRange } from './chartTimeRange';
 
 const STYLE_ID = 'pvs-debug-table-style';
 const TABLE_ID = 'pvs-debug-table';
@@ -461,29 +462,42 @@ function ensureToggleBeforeChart(): HTMLDivElement {
     return div;
 }
 
-function ensureToggleRows(): { root: HTMLDivElement; valueRow: HTMLDivElement; priceRow: HTMLDivElement } {
-    const root = ensureToggleBeforeChart();
-    let valueRow = root.querySelector<HTMLDivElement>('div[data-row="value"]') ?? null;
-    let priceRow = root.querySelector<HTMLDivElement>('div[data-row="price"]') ?? null;
+function ensureToggleRows(): {
+  root: HTMLDivElement;
+  valueRow: HTMLDivElement;
+  timeRangeRow: HTMLDivElement;
+  priceRow: HTMLDivElement;
+} {
+  const root = ensureToggleBeforeChart();
+  let valueRow = root.querySelector<HTMLDivElement>('div[data-row="value"]') ?? null;
+  let timeRangeRow = root.querySelector<HTMLDivElement>('div[data-row="timerange"]') ?? null;
+  let priceRow = root.querySelector<HTMLDivElement>('div[data-row="price"]') ?? null;
 
-    if (!valueRow) {
+  if (!valueRow) {
     valueRow = document.createElement('div');
     valueRow.className = 'row';
     valueRow.setAttribute('data-row', 'value');
     root.appendChild(valueRow);
-    }
-    if (!priceRow) {
+  }
+  if (!timeRangeRow) {
+    timeRangeRow = document.createElement('div');
+    timeRangeRow.className = 'row';
+    timeRangeRow.setAttribute('data-row', 'timerange');
+    root.appendChild(timeRangeRow);
+  }
+  if (!priceRow) {
     priceRow = document.createElement('div');
     priceRow.className = 'row';
     priceRow.setAttribute('data-row', 'price');
     root.appendChild(priceRow);
-    }
+  }
 
-    // Enforce order: value row first, then price row.
-    if (root.firstChild !== valueRow) root.insertBefore(valueRow, root.firstChild);
-    if (valueRow.nextSibling !== priceRow) root.insertBefore(priceRow, valueRow.nextSibling);
+  // Enforce order: value row, then time range row, then price row.
+  if (root.firstChild !== valueRow) root.insertBefore(valueRow, root.firstChild);
+  if (valueRow.nextSibling !== timeRangeRow) root.insertBefore(timeRangeRow, valueRow.nextSibling);
+  if (timeRangeRow.nextSibling !== priceRow) root.insertBefore(priceRow, timeRangeRow.nextSibling);
 
-    return { root, valueRow, priceRow };
+  return { root, valueRow, timeRangeRow, priceRow };
 }
 
 function ensureFetchReportAfterToggle(): HTMLDivElement {
@@ -548,10 +562,10 @@ export function renderPriceModeToggle(mode: PriceMode, onChange: (mode: PriceMod
     const { priceRow } = ensureToggleRows();
     priceRow.innerHTML = `
         <div class="btn-group">
-            <button class="btn ${mode === 'close' ? 'active' : ''}" data-mode="close" type="button">Close</button>
-            <button class="btn ${mode === 'adjclose' ? 'active' : ''}" data-mode="adjclose" type="button">Adj Close</button>
+            <button class="btn ${mode === 'adjclose' ? 'active' : ''}" data-mode="adjclose" type="button">調整後收盤價</button>
+            <button class="btn ${mode === 'close' ? 'active' : ''}" data-mode="close" type="button">收盤價</button>
         </div>
-        <span class="hint">市值計算口徑（不會重抓資料，僅重算/更新圖表與表格）</span>
+        <span class="hint">市值計算標準</span>
     `;
     priceRow.querySelectorAll<HTMLButtonElement>('button[data-mode]').forEach((b) => {
         b.onclick = () => {
@@ -591,6 +605,33 @@ export function renderValueModeToggle(mode: ValueMode, onChange: (mode: ValueMod
     }
 }
 
+const TIME_RANGE_OPTIONS: { value: ChartTimeRange; label: string }[] = [
+  { value: '1m', label: '1m' },
+  { value: '6m', label: '6m' },
+  { value: 'ytd', label: 'YTD' },
+  { value: '1y', label: '1y' },
+  { value: '3y', label: '3y' },
+  { value: 'max', label: 'max' },
+];
+
+export function renderTimeRangeButtons(range: ChartTimeRange, onChange: (range: ChartTimeRange) => void): void {
+  const { timeRangeRow } = ensureToggleRows();
+  timeRangeRow.innerHTML = `
+    <div class="btn-group">
+      ${TIME_RANGE_OPTIONS.map(
+        (o) =>
+          `<button class="btn ${range === o.value ? 'active' : ''}" data-timerange="${o.value}" type="button" title="圖表顯示區間">${o.label}</button>`
+      ).join('')}
+    </div>
+    <span class="hint">圖表時間區間（1m/6m/YTD/1y/3y/max）</span>
+  `;
+  timeRangeRow.querySelectorAll<HTMLButtonElement>('button[data-timerange]').forEach((b) => {
+    const r = b.getAttribute('data-timerange') as ChartTimeRange | null;
+    if (!r) return;
+    b.onclick = () => onChange(r);
+  });
+}
+
 export function renderChartRules(): void {
     const div = ensureRulesBetweenToggleAndChart();
     const items = [
@@ -626,9 +667,9 @@ export function renderDebugTable(
 ): void {
     const div = ensureContainerAfterChart();
     const anchorTicker = opts.anchorTicker ?? 'VTI';
-    const modeLabel = opts.mode === 'close' ? 'Close' : 'Adj Close';
+    const modeLabel = opts.mode === 'close' ? '收盤價' : '調整後收盤價';
     const noteItems = [
-    `目前市值計算口徑：${modeLabel}`,
+    `目前市值計算標準：${modeLabel}`,
     '比較規則：BUY-only（SELL 不納入比較）',
     '拆股還原規則：僅套用 splitDate > tradeDate（同日不套用）',
     '若價格有回補，會標示使用的實際日期',

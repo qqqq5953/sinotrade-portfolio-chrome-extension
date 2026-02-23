@@ -83,9 +83,15 @@ function zerosLike(points: { tsMs: number }[]): [number, number][] {
   return points.map((p) => [p.tsMs, 0]);
 }
 
-export function buildEchartsOption(series: ComputedSeries, opts?: { valueMode?: ChartValueMode }): any {
+export type ChartRangeOpt = { startIso: string; endIso: string } | undefined;
+
+export function buildEchartsOption(
+  series: ComputedSeries,
+  opts?: { valueMode?: ChartValueMode; range?: ChartRangeOpt }
+): any {
   const dbg = (series as MaybeWithDebug).debugRows;
   const valueMode: ChartValueMode = opts?.valueMode ?? 'amount';
+  const range = opts?.range;
 
   const portfolioData =
     valueMode === 'percent'
@@ -157,7 +163,13 @@ export function buildEchartsOption(series: ComputedSeries, opts?: { valueMode?: 
       containLabel: true
     },
     toolbox: { feature: { saveAsImage: {} } },
-    xAxis: { type: 'time', boundaryGap: false },
+    xAxis: {
+      type: 'time',
+      boundaryGap: false,
+      ...(range
+        ? { min: range.startIso, max: range.endIso }
+        : {})
+    },
     yAxis:
       valueMode === 'amount'
         ? { type: 'value' }

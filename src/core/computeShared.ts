@@ -279,6 +279,7 @@ function updateVtiSharesFromCashflows(args: {
   return { vtiSharesAfter: vtiShares, dayCashTotal, vtiDeltaSharesTotal, eventTraces };
 }
 
+// 負責「用還原後的股數 × 每日價格算市值」
 function valuePortfolioHoldings(args: {
   holdings: Holdings;
   priceSeriesByTicker: Map<string, PriceSeries>;
