@@ -29,6 +29,7 @@ import {
   setAccordionExpandCallback,
   renderChartRules,
   setDailyDetailDataProvider,
+  setDailyDetailButtonVisible,
   renderPriceFetchReport,
   renderPriceModeToggle,
   renderValueModeToggle,
@@ -316,20 +317,21 @@ function renderChartWithCurrentView(series: ComputedSeries): void {
 }
 
 function recomputeAndRender(): void {
-  if (!cachedEvents || !cachedByTicker) return;
-  const priceSeriesByTicker = buildPriceSeriesByTicker(priceMode);
-  const computed = computePortfolioVsVtiSeriesWithDebug({
-    events: cachedEvents,
-    priceSeriesByTicker,
-    maxBackTradingDays: 7,
-    anchorTicker: 'VTI'
-  });
-  cachedComputed = computed;
-  renderChartWithCurrentView(computed);
+    if (!cachedEvents || !cachedByTicker) return;
+    const priceSeriesByTicker = buildPriceSeriesByTicker(priceMode);
+    const computed = computePortfolioVsVtiSeriesWithDebug({
+        events: cachedEvents,
+        priceSeriesByTicker,
+        maxBackTradingDays: 7,
+        anchorTicker: 'VTI'
+    });
+    cachedComputed = computed;
+    renderChartWithCurrentView(computed);
 
-  const { closeByTicker, adjByTicker } = buildCloseAdjMaps();
-  if (cachedFetchReport) renderPriceFetchReport(cachedFetchReport);
-  renderChartRules();
+    buildCloseAdjMaps();
+    setDailyDetailButtonVisible(true);
+    if (cachedFetchReport) renderPriceFetchReport(cachedFetchReport);
+    renderChartRules();
 }
 
 /** Updates chart + rules/fetch report with cached data (no recompute). Use after valueMode or chartTimeRange change. */

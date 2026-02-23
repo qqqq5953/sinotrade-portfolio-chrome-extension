@@ -453,6 +453,7 @@ export function mountAccordion(opts?: { onUpdate?: () => void }): AccordionRef {
     dailyDetailBtn.className = 'pvs-header-icon-btn';
     dailyDetailBtn.setAttribute('aria-label', '每日明細');
     dailyDetailBtn.title = '每日明細：查看每個交易日的持倉、市值與計算依據';
+    dailyDetailBtn.style.display = 'none';
     dailyDetailBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>`;
     dailyDetailBtn.onclick = (e) => {
       e.preventDefault();
@@ -559,6 +560,12 @@ export function setFetchReportStatusIcon(failedCount: number): void {
             details.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
     };
+}
+
+export function setDailyDetailButtonVisible(show: boolean): void {
+    const btn = document.getElementById(DAILY_DETAIL_BTN_ID) as HTMLButtonElement | null;
+    if (!btn) return;
+    btn.style.display = show ? 'inline-flex' : 'none';
 }
 
 export function isAccordionOpen(): boolean {
