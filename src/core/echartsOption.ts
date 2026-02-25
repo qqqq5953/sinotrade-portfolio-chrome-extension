@@ -1,3 +1,4 @@
+import { PRIMARY_COLOR } from '../extension/tableMount';
 import type { ComputedSeries } from './types';
 
 type MaybeDebugRow = {
@@ -86,130 +87,129 @@ function zerosLike(points: { tsMs: number }[]): [number, number][] {
 export type ChartRangeOpt = { startIso: string; endIso: string } | undefined;
 
 export function buildEchartsOption(
-  series: ComputedSeries,
-  opts?: { valueMode?: ChartValueMode; range?: ChartRangeOpt }
-): any {
-  const dbg = (series as MaybeWithDebug).debugRows;
-  const valueMode: ChartValueMode = opts?.valueMode ?? 'amount';
-  const range = opts?.range;
+    series: ComputedSeries,
+    opts?: { valueMode?: ChartValueMode; range?: ChartRangeOpt }
+    ): any {
+    const dbg = (series as MaybeWithDebug).debugRows;
+    const valueMode: ChartValueMode = opts?.valueMode ?? 'amount';
+    const range = opts?.range;
 
-  const portfolioData =
-    valueMode === 'percent'
-      ? toReturnPctByCumulativeCash(series.portfolio, dbg)
-      : valueMode === 'excess'
-        ? toExcessPct(series.portfolio, series.vti)
-        : toAmount(series.portfolio);
-  const vtiData =
-    valueMode === 'percent'
-      ? toReturnPctByCumulativeCash(series.vti, dbg)
-      : valueMode === 'excess'
-        ? zerosLike(series.vti)
-        : toAmount(series.vti);
+    const portfolioData =
+        valueMode === 'percent'
+        ? toReturnPctByCumulativeCash(series.portfolio, dbg)
+        : valueMode === 'excess'
+            ? toExcessPct(series.portfolio, series.vti)
+            : toAmount(series.portfolio);
+    const vtiData =
+        valueMode === 'percent'
+        ? toReturnPctByCumulativeCash(series.vti, dbg)
+        : valueMode === 'excess'
+            ? zerosLike(series.vti)
+            : toAmount(series.vti);
 
-  const tooltipFormatter = (params: any): string => {
-    const list = Array.isArray(params) ? params : [params];
-    const first = list[0];
-    const tsMs = Array.isArray(first?.value) ? first.value[0] : first?.axisValue;
-    const dateLabel = tsMs ? new Date(tsMs).toISOString().slice(0, 10) : '';
-    const idx: number | null =
-      typeof first?.dataIndex === 'number' && Number.isFinite(first.dataIndex) ? Number(first.dataIndex) : null;
+    const tooltipFormatter = (params: any): string => {
+        const list = Array.isArray(params) ? params : [params];
+        const first = list[0];
+        const tsMs = Array.isArray(first?.value) ? first.value[0] : first?.axisValue;
+        const dateLabel = tsMs ? new Date(tsMs).toISOString().slice(0, 10) : '';
+        const idx: number | null =
+            typeof first?.dataIndex === 'number' && Number.isFinite(first.dataIndex) ? Number(first.dataIndex) : null;
 
-    let tradesBlock = '';
-    if (idx != null && Array.isArray(dbg) && dbg[idx] && Array.isArray(dbg[idx].events)) {
-      const events = dbg[idx].events ?? [];
-      const tickers = uniq(events.map((e) => String(e?.ticker ?? '').trim()).filter((t) => t.length > 0));
-      const { lines: tradeLines, total } = summarizeTradesByTicker(events);
-      if (tickers.length > 0 || tradeLines.length > 0) {
-        const sep = '<div style="border-top:1px solid #9ca3af; margin:6px 0;"></div>';
-        // Privacy: in percent/excess mode, do NOT show trade cash amounts (still lists tickers).
-        const body =
-          valueMode === 'percent' || valueMode === 'excess'
-            ? `${tickers.join('<br/>')}<br/>`
-            : tradeLines.length
-              ? `${tradeLines.join('<br/>')}<br/>`
-              : `${tickers.join('<br/>')}<br/>`;
-        const totalLine = valueMode === 'percent' || valueMode === 'excess' ? '' : `total trade value: ${fmtNumber(total)}<br/>`;
-        tradesBlock = `${sep}${body}${sep}${totalLine}`;
-      }
-    }
-
-    const lines = list
-      .map((p: any) => {
-        const name = String(p?.seriesName ?? '');
-        const v = Array.isArray(p?.value) ? p.value[1] : p?.value;
-        return `${name}: ${valueMode === 'amount' ? fmtNumber(v) : fmtPercent(v)}`;
-      })
-      .join('<br/>');
-
-    return `${dateLabel}<br/>${tradesBlock}${lines}`;
-  };
-
-  return {
-    title: { 
-        text: 'Portfolio vs VTI', 
-        left: 'center', 
-        padding: [0, 0, 8, 0], 
-        textStyle: { color: '#3f5372', fontSize: 20 }
-    },
-    tooltip: { trigger: 'axis', formatter: tooltipFormatter },
-    legend: { 
-        data: valueMode === 'excess' ? ['excess vs VTI', 'baseline'] : ['portfolio', 'vti'], 
-        top: '5%' 
-    },
-    grid: {
-      left: '0%',
-      right: '1%',
-      bottom: '3%',
-      containLabel: true
-    },
-    toolbox: { feature: { saveAsImage: {} } },
-    xAxis: {
-      type: 'time',
-      boundaryGap: false,
-      ...(range
-        ? { min: range.startIso, max: range.endIso }
-        : {})
-    },
-    yAxis:
-      valueMode === 'amount'
-        ? { type: 'value' }
-        : valueMode === 'percent'
-          ? {
-              type: 'value',
-              axisLabel: { formatter: (v: number) => `${v}%`, margin: 8 },
-              name: 'Return %',
-              nameGap: 20,
-              nameTextStyle: { align: 'center', padding: [0, 20, 0, 0] },
+        let tradesBlock = '';
+        if (idx != null && Array.isArray(dbg) && dbg[idx] && Array.isArray(dbg[idx].events)) {
+            const events = dbg[idx].events ?? [];
+            const tickers = uniq(events.map((e) => String(e?.ticker ?? '').trim()).filter((t) => t.length > 0));
+            const { lines: tradeLines, total } = summarizeTradesByTicker(events);
+            if (tickers.length > 0 || tradeLines.length > 0) {
+                const sep = '<div style="border-top:1px solid #9ca3af; margin:6px 0;"></div>';
+                // Privacy: in percent/excess mode, do NOT show trade cash amounts (still lists tickers).
+                const body =
+                valueMode === 'percent' || valueMode === 'excess'
+                    ? `${tickers.join('<br/>')}<br/>`
+                    : tradeLines.length
+                    ? `${tradeLines.join('<br/>')}<br/>`
+                    : `${tickers.join('<br/>')}<br/>`;
+                const totalLine = valueMode === 'percent' || valueMode === 'excess' ? '' : `total trade value: ${fmtNumber(total)}<br/>`;
+                tradesBlock = `${sep}${body}${sep}${totalLine}`;
             }
-          : {
-              type: 'value',
-              axisLabel: { formatter: (v: number) => `${v}%`, margin: 8 },
-              name: 'Excess %',
-              nameGap: 20,
-              nameTextStyle: { align: 'center', padding: [0, 12, 0, 0] },
-            },
-    series: [
-      {
-        name: valueMode === 'excess' ? 'excess vs VTI' : 'portfolio',
-        type: 'line',
-        showSymbol: false,
-        symbolSize: 10,
-        clip: false,
-        lineStyle: { color: '#c43826' },
-        itemStyle: { color: '#c43826' },
-        data: portfolioData
-      },
-      {
-        name: valueMode === 'excess' ? 'baseline' : 'vti',
-        type: 'line',
-        showSymbol: false,
-        symbolSize: 10,
-        clip: false,
-        lineStyle: { color: '#3f5372' },
-        itemStyle: { color: '#3f5372' },
-        data: vtiData
-      }
-    ]
-  };
-}
+        }
 
+        const lines = list
+            .map((p: any) => {
+                const name = String(p?.seriesName ?? '');
+                const v = Array.isArray(p?.value) ? p.value[1] : p?.value;
+                return `${name}: ${valueMode === 'amount' ? fmtNumber(v) : fmtPercent(v)}`;
+            })
+            .join('<br/>');
+
+        return `${dateLabel}<br/>${tradesBlock}${lines}`;
+    };
+
+    return {
+        title: { 
+            text: 'Portfolio vs VTI', 
+            left: 'center', 
+            padding: [0, 0, 8, 0], 
+            textStyle: { color: '#3f5372', fontSize: 20 }
+        },
+        tooltip: { trigger: 'axis', formatter: tooltipFormatter },
+        legend: { 
+            data: valueMode === 'excess' ? ['超額績效 %'] : ['portfolio', 'vti'], 
+            top: '5%' 
+        },
+        grid: {
+            left: '0%',
+            right: '1%',
+            bottom: '3%',
+            containLabel: true
+        },
+        toolbox: { feature: { saveAsImage: {} } },
+        xAxis: {
+            type: 'time',
+            boundaryGap: false,
+            ...(range
+                ? { min: range.startIso, max: range.endIso }
+                : {})
+        },
+        yAxis:
+            valueMode === 'amount'
+                ? { type: 'value' }
+                : valueMode === 'percent'
+                ? {
+                    type: 'value',
+                    axisLabel: { formatter: (v: number) => `${v}%`, margin: 8 },
+                    name: '累積報酬 %',
+                    nameGap: 20,
+                    nameTextStyle: { align: 'center', padding: [0, 20, 0, 0] },
+                    }
+                : {
+                    type: 'value',
+                    axisLabel: { formatter: (v: number) => `${v}%`, margin: 8 },
+                    name: '超額績效 %',
+                    nameGap: 20,
+                    nameTextStyle: { align: 'center', padding: [0, 12, 0, 0] },
+                    },
+        series: [
+            {
+                name: valueMode === 'excess' ? '超額績效 %' : 'portfolio',
+                type: 'line',
+                showSymbol: false,
+                clip: false,
+                symbolSize: 10,
+                lineStyle: { color: '#f45a4c', width: 1.5, opacity: 1 },
+                itemStyle: { color: '#f45a4c' },
+                data: portfolioData
+            },
+            {
+                name: valueMode === 'excess' ? 'baseline' : 'vti',
+                type: 'line',
+                showSymbol: false,
+                clip: false,
+                symbolSize: 10,
+                lineStyle: { color: PRIMARY_COLOR + 'b3', width: 1.5, opacity: valueMode === 'excess' ? 0 : 1 },
+                itemStyle: { color: PRIMARY_COLOR + 'b3' },
+                data: vtiData
+            }
+        ]
+    };
+}

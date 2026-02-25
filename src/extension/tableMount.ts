@@ -32,7 +32,7 @@ export function setChartBlockParent(el: HTMLElement | null): void {
 }
 
 /** 主色，用於按鈕、標題等，與網站配色一致 */
-const PRIMARY_COLOR = '#3f5372';
+export const PRIMARY_COLOR = '#3f5372';
 
 export type PriceMode = 'close' | 'adjclose';
 // Value mode controls chart display (privacy) only.
