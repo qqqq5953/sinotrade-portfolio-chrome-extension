@@ -9,12 +9,12 @@ type MaybeWithDebug = ComputedSeries & { debugRows?: MaybeDebugRow[] };
 
 export type ChartValueMode = 'percent' | 'excess' | 'amount';
 
-function fmtNumber(n: unknown): string {
+function formatNumber(n: unknown): string {
   if (typeof n !== 'number' || !Number.isFinite(n)) return String(n ?? '');
   return n.toLocaleString('en-US', { maximumFractionDigits: 6 });
 }
 
-function fmtPercent(n: unknown): string {
+function formatPercent(n: unknown): string {
   if (typeof n !== 'number' || !Number.isFinite(n)) return String(n ?? '');
   const sign = n > 0 ? '+' : '';
   return `${sign}${n.toLocaleString('en-US', { maximumFractionDigits: 4 })}%`;
@@ -36,11 +36,11 @@ function summarizeTradesByTicker(events: { ticker?: string; cash?: number }[]): 
   }
   const lines = [...acc.entries()]
     .sort((a, b) => a[0].localeCompare(b[0]))
-    .map(([t, v]) => `${t}: ${fmtNumber(v)}`);
+    .map(([t, v]) => `${t}: ${formatNumber(v)}`);
   return { lines, total };
 }
 
-function toReturnPctByCumulativeCash(
+function toReturnPercentByCumulativeCash(
   points: { tsMs: number; value: number }[],
   debugRows: MaybeDebugRow[] | undefined
 ): [number, number][] {
@@ -67,7 +67,7 @@ function toAmount(points: { tsMs: number; value: number }[]): [number, number][]
   return points.map((p) => [p.tsMs, p.value]);
 }
 
-function toExcessPct(portfolio: { tsMs: number; value: number }[], vti: { tsMs: number; value: number }[]): [number, number][] {
+function toExcessPercent(portfolio: { tsMs: number; value: number }[], vti: { tsMs: number; value: number }[]): [number, number][] {
   const n = Math.min(portfolio.length, vti.length);
   const out: [number, number][] = [];
   for (let i = 0; i < n; i += 1) {
@@ -96,13 +96,13 @@ export function buildEchartsOption(
 
     const portfolioData =
         valueMode === 'percent'
-        ? toReturnPctByCumulativeCash(series.portfolio, dbg)
+        ? toReturnPercentByCumulativeCash(series.portfolio, dbg)
         : valueMode === 'excess'
-            ? toExcessPct(series.portfolio, series.vti)
+            ? toExcessPercent(series.portfolio, series.vti)
             : toAmount(series.portfolio);
     const vtiData =
         valueMode === 'percent'
-        ? toReturnPctByCumulativeCash(series.vti, dbg)
+        ? toReturnPercentByCumulativeCash(series.vti, dbg)
         : valueMode === 'excess'
             ? zerosLike(series.vti)
             : toAmount(series.vti);
@@ -129,7 +129,7 @@ export function buildEchartsOption(
                     : tradeLines.length
                     ? `${tradeLines.join('<br/>')}<br/>`
                     : `${tickers.join('<br/>')}<br/>`;
-                const totalLine = valueMode === 'percent' || valueMode === 'excess' ? '' : `total trade value: ${fmtNumber(total)}<br/>`;
+                const totalLine = valueMode === 'percent' || valueMode === 'excess' ? '' : `total trade value: ${formatNumber(total)}<br/>`;
                 tradesBlock = `${sep}${body}${sep}${totalLine}`;
             }
         }
@@ -138,7 +138,7 @@ export function buildEchartsOption(
             .map((p: any) => {
                 const name = String(p?.seriesName ?? '');
                 const v = Array.isArray(p?.value) ? p.value[1] : p?.value;
-                return `${name}: ${valueMode === 'amount' ? fmtNumber(v) : fmtPercent(v)}`;
+                return `${name}: ${valueMode === 'amount' ? formatNumber(v) : formatPercent(v)}`;
             })
             .join('<br/>');
 
