@@ -354,7 +354,8 @@ function renderChartWithCurrentView(series: ComputedSeries): void {
     renderYearlySummary(null);
     renderChart(series, {
       valueMode,
-      title: '整體走勢（含歷年累積）',
+      title: '投資組合表現',
+      subtext: '含所有年度累積',
       useDataZoom: true,
     });
     return;
@@ -372,7 +373,8 @@ function renderChartWithCurrentView(series: ComputedSeries): void {
   });
   renderChart(yearly.series, {
     valueMode,
-    title: `${viewMode} 年度新增投入（僅該年買入，無前期累積）`,
+    title: `${viewMode} 年投資表現`,
+    subtext: '該年度新增投入的報酬',
     useDataZoom: false,
   });
 }

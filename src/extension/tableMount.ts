@@ -804,7 +804,7 @@ export function renderViewModeButtons(
   const { viewModeRow } = ensureToggleRows();
   const trendActive = selected === 'trend';
   const buttons = [
-    `<button class="btn ${trendActive ? 'active' : ''}" data-view="trend" type="button" title="整體走勢（含歷年累積）">走勢</button>`,
+    `<button class="btn ${trendActive ? 'active' : ''}" data-view="trend" type="button" title="全部期間的投資表現（含所有年度累積）">全部期間</button>`,
     ...years.map(
       (y) =>
         `<button class="btn ${selected === y ? 'active' : ''}" data-view="${y}" type="button" title="${y} 年度新增投入（僅該年買入，無前期累積）">${y}</button>`

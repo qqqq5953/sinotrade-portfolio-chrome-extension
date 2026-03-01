@@ -86,12 +86,13 @@ function zerosLike(points: { tsMs: number }[]): [number, number][] {
 
 export function buildEchartsOption(
   series: ComputedSeries,
-  opts?: { valueMode?: ChartValueMode; title?: string; useDataZoom?: boolean }
+  opts?: { valueMode?: ChartValueMode; title?: string; subtext?: string; useDataZoom?: boolean }
 ): any {
   const dbg = (series as MaybeWithDebug).debugRows;
   const valueMode: ChartValueMode = opts?.valueMode ?? 'amount';
   const titleText = opts?.title ?? 'Portfolio vs VTI';
-  const useDataZoom = opts?.useDataZoom !== false;
+  const subtext = opts?.subtext;
+  const useDataZoom = opts?.useDataZoom === true;
 
   const portfolioData =
         valueMode === 'percent'
@@ -144,28 +145,38 @@ export function buildEchartsOption(
         return `${dateLabel}<br/>${tradesBlock}${lines}`;
     };
 
-  const CHART_PRIMARY_COLOR = PRIMARY_COLOR + 'b3';
+    const CHART_PRIMARY_COLOR = PRIMARY_COLOR + 'b3';
 
-  const baseOption: any = {
-    title: {
-      text: titleText,
-      left: 'center',
-      padding: [0, 0, 8, 0],
-      textStyle: { color: PRIMARY_COLOR, fontSize: 20 },
-    },
-    tooltip: { trigger: 'axis', formatter: tooltipFormatter },
-    legend: {
-      data: valueMode === 'excess' ? ['超額績效 %'] : ['portfolio', 'vti'],
-      top: '5%',
-    },
-    grid: {
-      left: '0%',
-      right: '1%',
-      bottom: useDataZoom ? '15%' : '3%',
-      containLabel: true,
-    },
-    toolbox: { feature: { saveAsImage: {} } },
-    xAxis: {
+    const baseOption: any = {
+        title: {
+            text: titleText,
+            subtext: subtext ?? '',
+            left: 'center',
+            padding: [0, 0, 8, 0],
+            textStyle: { color: PRIMARY_COLOR, fontSize: 20 },
+            subtextStyle: { color: '#6b7280', fontSize: 12 },
+        },
+        tooltip: { trigger: 'axis', formatter: tooltipFormatter },
+        legend: {
+            data: valueMode === 'excess' ? ['超額績效 %'] : ['portfolio', 'vti'],
+            bottom: useDataZoom ? '14%' : '0%',
+        },
+        grid: {
+            left: '0%',
+            right: '1%',
+            bottom: useDataZoom ? '24%' : '12%',
+            containLabel: true,
+        },
+        toolbox: {
+            feature: {
+                dataZoom: {
+                    yAxisIndex: 'none'
+                },
+                restore: {},
+                saveAsImage: {}
+            }
+        },
+        xAxis: {
             type: 'time',
             boundaryGap: false
         },
@@ -187,48 +198,48 @@ export function buildEchartsOption(
                     nameGap: 20,
                     nameTextStyle: { align: 'center', padding: [0, 12, 0, 0] },
                     },
-    series: [
-      {
-        name: valueMode === 'excess' ? '超額績效 %' : 'portfolio',
-        type: 'line',
-        showSymbol: false,
-        clip: false,
-        symbolSize: 10,
-        lineStyle: { color: '#f45a4c', width: 1.5, opacity: 1 },
-        itemStyle: { color: '#f45a4c' },
-        data: portfolioData,
-      },
-      {
-        name: valueMode === 'excess' ? 'baseline' : 'vti',
-        type: 'line',
-        showSymbol: false,
-        clip: false,
-        symbolSize: 10,
-        lineStyle: {
-          color: CHART_PRIMARY_COLOR,
-          width: 1.5,
-          opacity: valueMode === 'excess' ? 0 : 1,
+        series: [
+        {
+            name: valueMode === 'excess' ? '超額績效 %' : 'portfolio',
+            type: 'line',
+            showSymbol: false,
+            clip: false,
+            symbolSize: 10,
+            lineStyle: { color: '#f45a4c', width: 1.5, opacity: 1 },
+            itemStyle: { color: '#f45a4c' },
+            data: portfolioData,
         },
-        itemStyle: { color: CHART_PRIMARY_COLOR },
-        data: vtiData,
-      },
-    ],
-  };
+        {
+            name: valueMode === 'excess' ? 'baseline' : 'vti',
+            type: 'line',
+            showSymbol: false,
+            clip: false,
+            symbolSize: 10,
+            lineStyle: {
+            color: CHART_PRIMARY_COLOR,
+            width: 1.5,
+            opacity: valueMode === 'excess' ? 0 : 1,
+            },
+            itemStyle: { color: CHART_PRIMARY_COLOR },
+            data: vtiData,
+        },
+        ],
+    };
 
-  if (useDataZoom) {
-    baseOption.dataZoom = [
-      { type: 'inside', xAxisIndex: 0, start: 0, end: 100 },
-      {
-        type: 'slider',
-        xAxisIndex: 0,
-        start: 0,
-        end: 100,
-        handleStyle: { color: CHART_PRIMARY_COLOR, borderColor: CHART_PRIMARY_COLOR },
-        dataBackground: { lineStyle: { color: PRIMARY_COLOR } },
-        selectedDataBackground: { lineStyle: { color: PRIMARY_COLOR } },
-      },
-    ];
-  }
+    if (useDataZoom) {
+        baseOption.dataZoom = [
+        { type: 'inside', xAxisIndex: 0, start: 0, end: 100, zoomOnMouseWheel: false },
+        {
+            type: 'slider',
+            xAxisIndex: 0,
+            start: 0,
+            end: 100,
+            handleStyle: { color: CHART_PRIMARY_COLOR, borderColor: CHART_PRIMARY_COLOR },
+            dataBackground: { lineStyle: { color: PRIMARY_COLOR } },
+            selectedDataBackground: { lineStyle: { color: PRIMARY_COLOR } },
+        },
+        ];
+    }
 
   return baseOption;
 }
