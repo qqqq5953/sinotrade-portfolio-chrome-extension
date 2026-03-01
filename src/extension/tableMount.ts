@@ -1,4 +1,5 @@
 import type { DebugDayRow, PriceSeries } from '../core';
+import { formatNumber, formatPercent } from '../core/number';
 
 const STYLE_ID = 'pvs-debug-table-style';
 const TABLE_ID = 'pvs-debug-table';
@@ -821,6 +822,8 @@ export function renderViewModeButtons(
 export function renderYearlySummary(data: {
   portfolioReturn: number;
   vtiReturn: number;
+  lastPortfolio?: number;
+  lastVti?: number;
   valueMode: ValueMode;
 } | null): void {
   const wrapper = document.getElementById(WRAPPER_ID);
@@ -836,16 +839,25 @@ export function renderYearlySummary(data: {
     wrapper.appendChild(div);
     orderWrapperChildren(wrapper);
   }
-  const fmt = (n: number) =>
-    Number.isFinite(n) ? `${n >= 0 ? '+' : ''}${(n * 100).toFixed(2)}%` : '—';
-  const pRet = fmt(data.portfolioReturn);
-  const vRet = fmt(data.vtiReturn);
-  const excess = Number.isFinite(data.portfolioReturn) && Number.isFinite(data.vtiReturn)
-    ? fmt(data.portfolioReturn - data.vtiReturn)
-    : '—';
+  let text = '';
+  if (data.valueMode === 'amount') {
+    const p = formatNumber(data.lastPortfolio);
+    const v = formatNumber(data.lastVti);
+    text = `投資組合：${p} | VTI 組合：${v}`;
+  } else if (data.valueMode === 'percent') {
+    const pRet = formatPercent(data.portfolioReturn * 100);
+    const vRet = formatPercent(data.vtiReturn * 100);
+    text = `投資組合：${pRet} | VTI 組合：${vRet}`;
+  } else {
+    const lp = data.lastPortfolio;
+    const lv = data.lastVti;
+    const denom = typeof lv === 'number' && Number.isFinite(lv) && Math.abs(lv) > 1e-12 ? lv : null;
+    const excessPct = denom != null && typeof lp === 'number' && Number.isFinite(lp) ? (lp / denom - 1) * 100 : NaN;
+    text = `超額：${formatPercent(excessPct)}`;
+  }
   div.innerHTML = `
-    <div class="row" style="font-size:12px; color:#374151; padding:4px 8px;">
-      投資組合：${pRet}　|　VTI：${vRet}　|　超額：${excess}
+    <div class="row" style="font-size:12px; color:#374151; padding:4px 8px; text-align:center;">
+      ${text}
     </div>
   `;
   div.style.display = '';

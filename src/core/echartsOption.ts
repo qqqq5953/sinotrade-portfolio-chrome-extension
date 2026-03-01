@@ -1,4 +1,5 @@
 import { PRIMARY_COLOR } from '../extension/tableMount';
+import { formatNumber, formatPercent } from './number';
 import type { ComputedSeries } from './types';
 
 type MaybeDebugRow = {
@@ -8,17 +9,6 @@ type MaybeDebugRow = {
 type MaybeWithDebug = ComputedSeries & { debugRows?: MaybeDebugRow[] };
 
 export type ChartValueMode = 'percent' | 'excess' | 'amount';
-
-function formatNumber(n: unknown): string {
-  if (typeof n !== 'number' || !Number.isFinite(n)) return String(n ?? '');
-  return n.toLocaleString('en-US', { maximumFractionDigits: 2 });
-}
-
-function formatPercent(n: unknown): string {
-  if (typeof n !== 'number' || !Number.isFinite(n)) return String(n ?? '');
-  const sign = n > 0 ? '+' : '';
-  return `${sign}${n.toLocaleString('en-US', { maximumFractionDigits: 2 })}%`;
-}
 
 function uniq<T>(arr: T[]): T[] {
   return [...new Set(arr)];

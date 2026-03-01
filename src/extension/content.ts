@@ -99,6 +99,8 @@ function computeYearlyReturns(year: number): {
   series: ComputedSeries;
   portfolioReturn: number;
   vtiReturn: number;
+  lastPortfolio: number;
+  lastVti: number;
 } | null {
   if (!cachedEvents || !cachedByTicker) return null;
   const eventsY = cachedEvents.filter(
@@ -122,6 +124,8 @@ function computeYearlyReturns(year: number): {
     series: computed,
     portfolioReturn,
     vtiReturn,
+    lastPortfolio,
+    lastVti,
   };
 }
 
@@ -369,6 +373,8 @@ function renderChartWithCurrentView(series: ComputedSeries): void {
   renderYearlySummary({
     portfolioReturn: yearly.portfolioReturn,
     vtiReturn: yearly.vtiReturn,
+    lastPortfolio: yearly.lastPortfolio,
+    lastVti: yearly.lastVti,
     valueMode,
   });
   renderChart(yearly.series, {
