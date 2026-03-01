@@ -123,8 +123,7 @@ export function buildEchartsOption(
             if (tickers.length > 0 || tradeLines.length > 0) {
                 const sep = '<div style="border-top:1px solid #9ca3af; margin:6px 0;"></div>';
                 // Privacy: in percent/excess mode, do NOT show trade cash amounts (still lists tickers).
-                const body =
-                valueMode === 'percent' || valueMode === 'excess'
+                const body = valueMode === 'percent' || valueMode === 'excess'
                     ? `${tickers.join('<br/>')}<br/>`
                     : tradeLines.length
                     ? `${tradeLines.join('<br/>')}<br/>`
@@ -135,6 +134,7 @@ export function buildEchartsOption(
         }
 
         const lines = list
+            .filter((p: any) => !(valueMode === 'excess' && String(p?.seriesName ?? '') === 'baseline'))
             .map((p: any) => {
                 const name = String(p?.seriesName ?? '');
                 const v = Array.isArray(p?.value) ? p.value[1] : p?.value;
