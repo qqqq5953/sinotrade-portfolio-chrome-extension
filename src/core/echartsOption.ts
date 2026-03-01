@@ -84,15 +84,12 @@ function zerosLike(points: { tsMs: number }[]): [number, number][] {
   return points.map((p) => [p.tsMs, 0]);
 }
 
-export type ChartRangeOpt = { startIso: string; endIso: string } | undefined;
-
 export function buildEchartsOption(
     series: ComputedSeries,
-    opts?: { valueMode?: ChartValueMode; range?: ChartRangeOpt }
+    opts?: { valueMode?: ChartValueMode }
     ): any {
     const dbg = (series as MaybeWithDebug).debugRows;
     const valueMode: ChartValueMode = opts?.valueMode ?? 'amount';
-    const range = opts?.range;
 
     const portfolioData =
         valueMode === 'percent'
@@ -145,12 +142,14 @@ export function buildEchartsOption(
         return `${dateLabel}<br/>${tradesBlock}${lines}`;
     };
 
+    const CHART_PRIMARY_COLOR = PRIMARY_COLOR + 'b3';
+
     return {
         title: { 
             text: 'Portfolio vs VTI', 
             left: 'center', 
             padding: [0, 0, 8, 0], 
-            textStyle: { color: '#3f5372', fontSize: 20 }
+            textStyle: { color: PRIMARY_COLOR, fontSize: 20 }
         },
         tooltip: { trigger: 'axis', formatter: tooltipFormatter },
         legend: { 
@@ -160,16 +159,41 @@ export function buildEchartsOption(
         grid: {
             left: '0%',
             right: '1%',
-            bottom: '3%',
+            bottom: '15%',
             containLabel: true
         },
         toolbox: { feature: { saveAsImage: {} } },
+        dataZoom: [
+            { 
+                type: 'inside', 
+                xAxisIndex: 0, 
+                start: 0, 
+                end: 100 
+            },
+            { 
+                type: 'slider', 
+                xAxisIndex: 0, 
+                start: 0, 
+                end: 100,
+                handleStyle:{
+                    color: CHART_PRIMARY_COLOR,
+                    borderColor: CHART_PRIMARY_COLOR,
+                },
+                dataBackground:{
+                    lineStyle:{
+                        color: PRIMARY_COLOR
+                    },
+                },
+                selectedDataBackground:{
+                    lineStyle:{
+                        color: PRIMARY_COLOR
+                    }
+                }
+            },
+        ],
         xAxis: {
             type: 'time',
-            boundaryGap: false,
-            ...(range
-                ? { min: range.startIso, max: range.endIso }
-                : {})
+            boundaryGap: false
         },
         yAxis:
             valueMode === 'amount'
@@ -206,8 +230,8 @@ export function buildEchartsOption(
                 showSymbol: false,
                 clip: false,
                 symbolSize: 10,
-                lineStyle: { color: PRIMARY_COLOR + 'b3', width: 1.5, opacity: valueMode === 'excess' ? 0 : 1 },
-                itemStyle: { color: PRIMARY_COLOR + 'b3' },
+                lineStyle: { color: CHART_PRIMARY_COLOR, width: 1.5, opacity: valueMode === 'excess' ? 0 : 1 },
+                itemStyle: { color: CHART_PRIMARY_COLOR },
                 data: vtiData
             }
         ]

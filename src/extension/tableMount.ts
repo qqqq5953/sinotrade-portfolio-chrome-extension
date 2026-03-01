@@ -1,5 +1,4 @@
 import type { DebugDayRow, PriceSeries } from '../core';
-import type { ChartTimeRange } from './chartTimeRange';
 
 const STYLE_ID = 'pvs-debug-table-style';
 const TABLE_ID = 'pvs-debug-table';
@@ -758,12 +757,12 @@ function ensureToggleRows(): {
   root: HTMLDivElement;
   valueRow: HTMLDivElement;
   priceRow: HTMLDivElement;
-  timeRangeRow: HTMLDivElement;
 } {
   const root = ensureToggleBeforeChart();
+  const oldTimeRangeRow = root.querySelector<HTMLDivElement>('div[data-row="timerange"]');
+  if (oldTimeRangeRow) oldTimeRangeRow.remove();
   let valueRow = root.querySelector<HTMLDivElement>('div[data-row="value"]') ?? null;
   let priceRow = root.querySelector<HTMLDivElement>('div[data-row="price"]') ?? null;
-  let timeRangeRow = root.querySelector<HTMLDivElement>('div[data-row="timerange"]') ?? null;
 
   if (!valueRow) {
     valueRow = document.createElement('div');
@@ -777,19 +776,12 @@ function ensureToggleRows(): {
     priceRow.setAttribute('data-row', 'price');
     root.appendChild(priceRow);
   }
-  if (!timeRangeRow) {
-    timeRangeRow = document.createElement('div');
-    timeRangeRow.className = 'row';
-    timeRangeRow.setAttribute('data-row', 'timerange');
-    root.appendChild(timeRangeRow);
-  }
 
-  // Enforce order: value row => price row => time range row.
+  // Enforce order: value row => price row.
   if (root.firstChild !== valueRow) root.insertBefore(valueRow, root.firstChild);
   if (valueRow.nextSibling !== priceRow) root.insertBefore(priceRow, valueRow.nextSibling);
-  if (priceRow.nextSibling !== timeRangeRow) root.insertBefore(timeRangeRow, priceRow.nextSibling);
 
-  return { root, valueRow, priceRow, timeRangeRow };
+  return { root, valueRow, priceRow };
 }
 
 function ensureFetchReportAfterToggle(): HTMLDivElement {
@@ -892,32 +884,6 @@ export function renderValueModeToggle(mode: ValueMode, onChange: (mode: ValueMod
         b.classList.toggle('active', m === mode);
         b.onclick = () => onChange(m);
     });
-}
-
-const TIME_RANGE_OPTIONS: { value: ChartTimeRange; label: string }[] = [
-  { value: '1m', label: '1m' },
-  { value: '6m', label: '6m' },
-  { value: 'ytd', label: 'YTD' },
-  { value: '1y', label: '1y' },
-  { value: '3y', label: '3y' },
-  { value: 'max', label: 'max' },
-];
-
-export function renderTimeRangeButtons(range: ChartTimeRange, onChange: (range: ChartTimeRange) => void): void {
-  const { timeRangeRow } = ensureToggleRows();
-  timeRangeRow.innerHTML = `
-    <div class="btn-group">
-      ${TIME_RANGE_OPTIONS.map(
-        (o) =>
-          `<button class="btn ${range === o.value ? 'active' : ''}" data-timerange="${o.value}" type="button" title="圖表顯示區間">${o.label}</button>`
-      ).join('')}
-    </div>
-  `;
-  timeRangeRow.querySelectorAll<HTMLButtonElement>('button[data-timerange]').forEach((b) => {
-    const r = b.getAttribute('data-timerange') as ChartTimeRange | null;
-    if (!r) return;
-    b.onclick = () => onChange(r);
-  });
 }
 
 export function renderChartRules(): void {

@@ -33,12 +33,10 @@ import {
   renderPriceFetchReport,
   renderPriceModeToggle,
   renderValueModeToggle,
-  renderTimeRangeButtons,
   WRAPPER_ID,
   type PriceMode,
   type ValueMode
 } from './tableMount';
-import { getTimeRangeBounds, type ChartTimeRange } from './chartTimeRange';
 import {
   getBuyEvents,
   setBuyEvents,
@@ -80,7 +78,6 @@ let cachedEvents: TradeEvent[] | null = null;
 let cachedByTicker: Map<string, DualSeries> | null = null;
 let priceMode: PriceMode = 'adjclose'; // default per user request
 let valueMode: ValueMode = 'excess';
-let chartTimeRange: ChartTimeRange = 'max';
 let cachedComputed: ReturnType<typeof computePortfolioVsVtiSeriesWithDebug> | null = null;
 
 
@@ -306,14 +303,9 @@ function buildCloseAdjMaps(): { closeByTicker: Map<string, PriceSeries>; adjByTi
   return { closeByTicker, adjByTicker };
 }
 
-/** Renders the chart with current valueMode and chartTimeRange (no recompute). */
+/** Renders the chart with current valueMode (no recompute). */
 function renderChartWithCurrentView(series: ComputedSeries): void {
-  const dates = series.resolvedIsoDatesET;
-  const range =
-    dates.length > 0
-      ? getTimeRangeBounds(chartTimeRange, dates[0]!, dates[dates.length - 1]!)
-      : undefined;
-  renderChart(series, { valueMode, range });
+  renderChart(series, { valueMode });
 }
 
 function recomputeAndRender(): void {
@@ -334,7 +326,7 @@ function recomputeAndRender(): void {
     renderChartRules();
 }
 
-/** Updates chart + rules/fetch report with cached data (no recompute). Use after valueMode or chartTimeRange change. */
+/** Updates chart + rules/fetch report with cached data (no recompute). Use after valueMode change. */
 function updateChartView(): void {
   if (!cachedComputed) return;
   renderChartWithCurrentView(cachedComputed);
@@ -352,12 +344,6 @@ function renderToggles(): void {
   renderValueModeToggle(valueMode, (m) => {
     if (valueMode === m) return;
     valueMode = m;
-    renderToggles();
-    updateChartView();
-  });
-  renderTimeRangeButtons(chartTimeRange, (r) => {
-    if (chartTimeRange === r) return;
-    chartTimeRange = r;
     renderToggles();
     updateChartView();
   });
