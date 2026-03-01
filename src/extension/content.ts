@@ -1,5 +1,6 @@
 import {
   computePortfolioVsVtiSeriesWithDebug,
+  getYearsFromEvents,
   normalizeBuyEventsBySplits,
   parseYahooChartToPriceSeriesPair,
   parseYahooChartSplits,
@@ -83,17 +84,6 @@ let priceMode: PriceMode = 'adjclose'; // default per user request
 let valueMode: ValueMode = 'excess';
 let viewMode: ViewMode = 'trend';
 let cachedComputed: ReturnType<typeof computePortfolioVsVtiSeriesWithDebug> | null = null;
-
-function getYearsFromEvents(events: TradeEvent[]): number[] {
-  const buyOnly = events.filter((e) => e.type === 'BUY');
-  if (buyOnly.length === 0) return [];
-  const years = new Set<number>();
-  for (const e of buyOnly) {
-    const y = parseInt(String(e.isoDateET).slice(0, 4), 10);
-    if (Number.isFinite(y)) years.add(y);
-  }
-  return [...years].sort((a, b) => a - b);
-}
 
 function computeYearlyReturns(year: number): {
   series: ComputedSeries;

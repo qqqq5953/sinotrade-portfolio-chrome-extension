@@ -4,6 +4,7 @@ import path from 'node:path';
 
 import {
   computePortfolioVsVtiSeries,
+  getYearsFromEvents,
   normalizeBuyEventsBySplits,
   parseNumberStrict,
   parseYahooChartSplits,
@@ -33,6 +34,29 @@ test('parseNumberStrict handles commas and decimals', () => {
 test('toIsoDateETFromYmdSlash normalizes date', () => {
   assert.equal(toIsoDateETFromYmdSlash('2024/12/30'), '2024-12-30');
   assert.equal(toIsoDateETFromYmdSlash('2024-1-2'), '2024-01-02');
+});
+
+test('getYearsFromEvents extracts unique years from BUY events, sorted', () => {
+  const events: TradeEvent[] = [
+    { type: 'BUY', tradeDate: '2023/06/15', isoDateET: '2023-06-15', ticker: 'VTI', shares: 1, cash: 100, sourceYear: 2023 },
+    { type: 'BUY', tradeDate: '2024/01/10', isoDateET: '2024-01-10', ticker: 'VTI', shares: 1, cash: 100, sourceYear: 2024 },
+    { type: 'SELL', tradeDate: '2024/06/01', isoDateET: '2024-06-01', ticker: 'VTI', shares: 0.5, cash: 60, sourceYear: 2024 },
+    { type: 'BUY', tradeDate: '2022/12/01', isoDateET: '2022-12-01', ticker: 'COST', shares: 2, cash: 200, sourceYear: 2022 },
+    { type: 'BUY', tradeDate: '2024/03/20', isoDateET: '2024-03-20', ticker: 'NVDA', shares: 1, cash: 150, sourceYear: 2024 }
+  ];
+  const years = getYearsFromEvents(events);
+  assert.deepEqual(years, [2022, 2023, 2024]);
+});
+
+test('getYearsFromEvents returns empty when no BUY events', () => {
+  const events: TradeEvent[] = [
+    { type: 'SELL', tradeDate: '2024/01/01', isoDateET: '2024-01-01', ticker: 'VTI', shares: 1, cash: 100, sourceYear: 2024 }
+  ];
+  assert.deepEqual(getYearsFromEvents(events), []);
+});
+
+test('getYearsFromEvents returns empty for empty events', () => {
+  assert.deepEqual(getYearsFromEvents([]), []);
 });
 
 test('parseYahooChartToPriceSeries prefers adjclose by default', async () => {
