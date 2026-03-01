@@ -11,13 +11,13 @@ export type ChartValueMode = 'percent' | 'excess' | 'amount';
 
 function formatNumber(n: unknown): string {
   if (typeof n !== 'number' || !Number.isFinite(n)) return String(n ?? '');
-  return n.toLocaleString('en-US', { maximumFractionDigits: 6 });
+  return n.toLocaleString('en-US', { maximumFractionDigits: 2 });
 }
 
 function formatPercent(n: unknown): string {
   if (typeof n !== 'number' || !Number.isFinite(n)) return String(n ?? '');
   const sign = n > 0 ? '+' : '';
-  return `${sign}${n.toLocaleString('en-US', { maximumFractionDigits: 4 })}%`;
+  return `${sign}${n.toLocaleString('en-US', { maximumFractionDigits: 2 })}%`;
 }
 
 function uniq<T>(arr: T[]): T[] {
@@ -170,10 +170,18 @@ export function buildEchartsOption(
         toolbox: {
             feature: {
                 dataZoom: {
-                    yAxisIndex: 'none'
+                    yAxisIndex: 'none',
+                    title: {
+                        zoom: '區域縮放',
+                        back: '還原縮放'
+                    }
                 },
-                restore: {},
-                saveAsImage: {}
+                restore: {
+                    title: '還原'
+                },
+                saveAsImage: {
+                    title: '儲存為圖片'
+                }
             }
         },
         xAxis: {
