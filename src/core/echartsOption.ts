@@ -85,13 +85,15 @@ function zerosLike(points: { tsMs: number }[]): [number, number][] {
 }
 
 export function buildEchartsOption(
-    series: ComputedSeries,
-    opts?: { valueMode?: ChartValueMode }
-    ): any {
-    const dbg = (series as MaybeWithDebug).debugRows;
-    const valueMode: ChartValueMode = opts?.valueMode ?? 'amount';
+  series: ComputedSeries,
+  opts?: { valueMode?: ChartValueMode; title?: string; useDataZoom?: boolean }
+): any {
+  const dbg = (series as MaybeWithDebug).debugRows;
+  const valueMode: ChartValueMode = opts?.valueMode ?? 'amount';
+  const titleText = opts?.title ?? 'Portfolio vs VTI';
+  const useDataZoom = opts?.useDataZoom !== false;
 
-    const portfolioData =
+  const portfolioData =
         valueMode === 'percent'
         ? toReturnPercentByCumulativeCash(series.portfolio, dbg)
         : valueMode === 'excess'
@@ -142,56 +144,28 @@ export function buildEchartsOption(
         return `${dateLabel}<br/>${tradesBlock}${lines}`;
     };
 
-    const CHART_PRIMARY_COLOR = PRIMARY_COLOR + 'b3';
+  const CHART_PRIMARY_COLOR = PRIMARY_COLOR + 'b3';
 
-    return {
-        title: { 
-            text: 'Portfolio vs VTI', 
-            left: 'center', 
-            padding: [0, 0, 8, 0], 
-            textStyle: { color: PRIMARY_COLOR, fontSize: 20 }
-        },
-        tooltip: { trigger: 'axis', formatter: tooltipFormatter },
-        legend: { 
-            data: valueMode === 'excess' ? ['超額績效 %'] : ['portfolio', 'vti'], 
-            top: '5%' 
-        },
-        grid: {
-            left: '0%',
-            right: '1%',
-            bottom: '15%',
-            containLabel: true
-        },
-        toolbox: { feature: { saveAsImage: {} } },
-        dataZoom: [
-            { 
-                type: 'inside', 
-                xAxisIndex: 0, 
-                start: 0, 
-                end: 100 
-            },
-            { 
-                type: 'slider', 
-                xAxisIndex: 0, 
-                start: 0, 
-                end: 100,
-                handleStyle:{
-                    color: CHART_PRIMARY_COLOR,
-                    borderColor: CHART_PRIMARY_COLOR,
-                },
-                dataBackground:{
-                    lineStyle:{
-                        color: PRIMARY_COLOR
-                    },
-                },
-                selectedDataBackground:{
-                    lineStyle:{
-                        color: PRIMARY_COLOR
-                    }
-                }
-            },
-        ],
-        xAxis: {
+  const baseOption: any = {
+    title: {
+      text: titleText,
+      left: 'center',
+      padding: [0, 0, 8, 0],
+      textStyle: { color: PRIMARY_COLOR, fontSize: 20 },
+    },
+    tooltip: { trigger: 'axis', formatter: tooltipFormatter },
+    legend: {
+      data: valueMode === 'excess' ? ['超額績效 %'] : ['portfolio', 'vti'],
+      top: '5%',
+    },
+    grid: {
+      left: '0%',
+      right: '1%',
+      bottom: useDataZoom ? '15%' : '3%',
+      containLabel: true,
+    },
+    toolbox: { feature: { saveAsImage: {} } },
+    xAxis: {
             type: 'time',
             boundaryGap: false
         },
@@ -213,27 +187,48 @@ export function buildEchartsOption(
                     nameGap: 20,
                     nameTextStyle: { align: 'center', padding: [0, 12, 0, 0] },
                     },
-        series: [
-            {
-                name: valueMode === 'excess' ? '超額績效 %' : 'portfolio',
-                type: 'line',
-                showSymbol: false,
-                clip: false,
-                symbolSize: 10,
-                lineStyle: { color: '#f45a4c', width: 1.5, opacity: 1 },
-                itemStyle: { color: '#f45a4c' },
-                data: portfolioData
-            },
-            {
-                name: valueMode === 'excess' ? 'baseline' : 'vti',
-                type: 'line',
-                showSymbol: false,
-                clip: false,
-                symbolSize: 10,
-                lineStyle: { color: CHART_PRIMARY_COLOR, width: 1.5, opacity: valueMode === 'excess' ? 0 : 1 },
-                itemStyle: { color: CHART_PRIMARY_COLOR },
-                data: vtiData
-            }
-        ]
-    };
+    series: [
+      {
+        name: valueMode === 'excess' ? '超額績效 %' : 'portfolio',
+        type: 'line',
+        showSymbol: false,
+        clip: false,
+        symbolSize: 10,
+        lineStyle: { color: '#f45a4c', width: 1.5, opacity: 1 },
+        itemStyle: { color: '#f45a4c' },
+        data: portfolioData,
+      },
+      {
+        name: valueMode === 'excess' ? 'baseline' : 'vti',
+        type: 'line',
+        showSymbol: false,
+        clip: false,
+        symbolSize: 10,
+        lineStyle: {
+          color: CHART_PRIMARY_COLOR,
+          width: 1.5,
+          opacity: valueMode === 'excess' ? 0 : 1,
+        },
+        itemStyle: { color: CHART_PRIMARY_COLOR },
+        data: vtiData,
+      },
+    ],
+  };
+
+  if (useDataZoom) {
+    baseOption.dataZoom = [
+      { type: 'inside', xAxisIndex: 0, start: 0, end: 100 },
+      {
+        type: 'slider',
+        xAxisIndex: 0,
+        start: 0,
+        end: 100,
+        handleStyle: { color: CHART_PRIMARY_COLOR, borderColor: CHART_PRIMARY_COLOR },
+        dataBackground: { lineStyle: { color: PRIMARY_COLOR } },
+        selectedDataBackground: { lineStyle: { color: PRIMARY_COLOR } },
+      },
+    ];
+  }
+
+  return baseOption;
 }

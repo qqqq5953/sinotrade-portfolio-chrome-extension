@@ -17,7 +17,8 @@ const FETCH_STATUS_ICON_ID = 'pvs-fetch-status-icon';
 const RULES_DETAILS_ID = 'pvs-rules-details';
 const FETCH_DETAILS_ID = 'pvs-fetch-details';
 
-const BLOCK_ORDER = [TOGGLE_ID, 'chart', RULES_DETAILS_ID, FETCH_DETAILS_ID] as const;
+const YEARLY_SUMMARY_ID = 'pvs-yearly-summary';
+const BLOCK_ORDER = [TOGGLE_ID, 'chart', YEARLY_SUMMARY_ID, RULES_DETAILS_ID, FETCH_DETAILS_ID] as const;
 
 const MODAL_OVERLAY_ID = 'pvs-daily-detail-modal-overlay';
 const MODAL_PANEL_ID = 'pvs-daily-detail-modal-panel';
@@ -753,16 +754,20 @@ function ensureToggleBeforeChart(): HTMLDivElement {
     return div;
 }
 
+export type ViewMode = 'trend' | number;
+
 function ensureToggleRows(): {
   root: HTMLDivElement;
   valueRow: HTMLDivElement;
   priceRow: HTMLDivElement;
+  viewModeRow: HTMLDivElement;
 } {
   const root = ensureToggleBeforeChart();
   const oldTimeRangeRow = root.querySelector<HTMLDivElement>('div[data-row="timerange"]');
   if (oldTimeRangeRow) oldTimeRangeRow.remove();
   let valueRow = root.querySelector<HTMLDivElement>('div[data-row="value"]') ?? null;
   let priceRow = root.querySelector<HTMLDivElement>('div[data-row="price"]') ?? null;
+  let viewModeRow = root.querySelector<HTMLDivElement>('div[data-row="viewmode"]') ?? null;
 
   if (!valueRow) {
     valueRow = document.createElement('div');
@@ -776,12 +781,74 @@ function ensureToggleRows(): {
     priceRow.setAttribute('data-row', 'price');
     root.appendChild(priceRow);
   }
+  if (!viewModeRow) {
+    viewModeRow = document.createElement('div');
+    viewModeRow.className = 'row';
+    viewModeRow.setAttribute('data-row', 'viewmode');
+    root.appendChild(viewModeRow);
+  }
 
-  // Enforce order: value row => price row.
+  // Enforce order: value => price => viewMode (走勢 + years).
   if (root.firstChild !== valueRow) root.insertBefore(valueRow, root.firstChild);
   if (valueRow.nextSibling !== priceRow) root.insertBefore(priceRow, valueRow.nextSibling);
+  if (priceRow.nextSibling !== viewModeRow) root.insertBefore(viewModeRow, priceRow.nextSibling);
 
-  return { root, valueRow, priceRow };
+  return { root, valueRow, priceRow, viewModeRow };
+}
+
+export function renderViewModeButtons(
+  years: number[],
+  selected: ViewMode,
+  onChange: (v: ViewMode) => void
+): void {
+  const { viewModeRow } = ensureToggleRows();
+  const trendActive = selected === 'trend';
+  const buttons = [
+    `<button class="btn ${trendActive ? 'active' : ''}" data-view="trend" type="button" title="整體走勢（含歷年累積）">走勢</button>`,
+    ...years.map(
+      (y) =>
+        `<button class="btn ${selected === y ? 'active' : ''}" data-view="${y}" type="button" title="${y} 年度新增投入（僅該年買入，無前期累積）">${y}</button>`
+    ),
+  ];
+  viewModeRow.innerHTML = `<div class="btn-group">${buttons.join('')}</div>`;
+  viewModeRow.querySelectorAll<HTMLButtonElement>('button[data-view]').forEach((b) => {
+    const v = b.getAttribute('data-view');
+    if (!v) return;
+    b.onclick = () => onChange(v === 'trend' ? 'trend' : parseInt(v, 10));
+  });
+}
+
+export function renderYearlySummary(data: {
+  portfolioReturn: number;
+  vtiReturn: number;
+  valueMode: ValueMode;
+} | null): void {
+  const wrapper = document.getElementById(WRAPPER_ID);
+  if (!wrapper) return;
+  let div = document.getElementById(YEARLY_SUMMARY_ID) as HTMLDivElement | null;
+  if (!data) {
+    div?.remove();
+    return;
+  }
+  if (!div) {
+    div = document.createElement('div');
+    div.id = YEARLY_SUMMARY_ID;
+    wrapper.appendChild(div);
+    orderWrapperChildren(wrapper);
+  }
+  const fmt = (n: number) =>
+    Number.isFinite(n) ? `${n >= 0 ? '+' : ''}${(n * 100).toFixed(2)}%` : '—';
+  const pRet = fmt(data.portfolioReturn);
+  const vRet = fmt(data.vtiReturn);
+  const excess = Number.isFinite(data.portfolioReturn) && Number.isFinite(data.vtiReturn)
+    ? fmt(data.portfolioReturn - data.vtiReturn)
+    : '—';
+  div.innerHTML = `
+    <div class="row" style="font-size:12px; color:#374151; padding:4px 8px;">
+      投資組合：${pRet}　|　VTI：${vRet}　|　超額：${excess}
+    </div>
+  `;
+  div.style.display = '';
 }
 
 function ensureFetchReportAfterToggle(): HTMLDivElement {

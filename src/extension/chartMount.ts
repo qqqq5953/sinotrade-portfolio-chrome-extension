@@ -30,12 +30,14 @@ export type ChartValueMode = 'percent' | 'excess' | 'amount';
 
 export function renderChart(
   series: ComputedSeries,
-  opts?: { valueMode?: ChartValueMode }
+  opts?: { valueMode?: ChartValueMode; title?: string; useDataZoom?: boolean }
 ): void {
   const container = ensureChartContainer();
   const chart = echarts.init(container);
-  const buildOpts: { valueMode?: ChartValueMode } = {};
+  const buildOpts: Parameters<typeof buildEchartsOption>[1] = {};
   if (opts?.valueMode) buildOpts.valueMode = opts.valueMode;
+  if (opts?.title) buildOpts.title = opts.title;
+  if (opts?.useDataZoom !== undefined) buildOpts.useDataZoom = opts.useDataZoom;
   chart.setOption(buildEchartsOption(series, buildOpts), { notMerge: true });
 }
 

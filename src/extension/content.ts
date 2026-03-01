@@ -33,9 +33,12 @@ import {
   renderPriceFetchReport,
   renderPriceModeToggle,
   renderValueModeToggle,
+  renderViewModeButtons,
+  renderYearlySummary,
   WRAPPER_ID,
   type PriceMode,
-  type ValueMode
+  type ValueMode,
+  type ViewMode,
 } from './tableMount';
 import {
   getBuyEvents,
@@ -78,7 +81,49 @@ let cachedEvents: TradeEvent[] | null = null;
 let cachedByTicker: Map<string, DualSeries> | null = null;
 let priceMode: PriceMode = 'adjclose'; // default per user request
 let valueMode: ValueMode = 'excess';
+let viewMode: ViewMode = 'trend';
 let cachedComputed: ReturnType<typeof computePortfolioVsVtiSeriesWithDebug> | null = null;
+
+function getYearsFromEvents(events: TradeEvent[]): number[] {
+  const buyOnly = events.filter((e) => e.type === 'BUY');
+  if (buyOnly.length === 0) return [];
+  const years = new Set<number>();
+  for (const e of buyOnly) {
+    const y = parseInt(String(e.isoDateET).slice(0, 4), 10);
+    if (Number.isFinite(y)) years.add(y);
+  }
+  return [...years].sort((a, b) => a - b);
+}
+
+function computeYearlyReturns(year: number): {
+  series: ComputedSeries;
+  portfolioReturn: number;
+  vtiReturn: number;
+} | null {
+  if (!cachedEvents || !cachedByTicker) return null;
+  const eventsY = cachedEvents.filter(
+    (e) => e.type === 'BUY' && String(e.isoDateET).startsWith(`${year}-`)
+  );
+  if (eventsY.length === 0) return null;
+  const costY = eventsY.reduce((sum, e) => sum + e.cash, 0);
+  if (costY < 1e-12) return null;
+  const priceSeriesByTicker = buildPriceSeriesByTicker(priceMode);
+  const computed = computePortfolioVsVtiSeriesWithDebug({
+    events: eventsY,
+    priceSeriesByTicker,
+    maxBackTradingDays: 7,
+    anchorTicker: 'VTI',
+  });
+  const lastPortfolio = computed.portfolio[computed.portfolio.length - 1]?.value ?? 0;
+  const lastVti = computed.vti[computed.vti.length - 1]?.value ?? 0;
+  const portfolioReturn = (lastPortfolio - costY) / costY;
+  const vtiReturn = (lastVti - costY) / costY;
+  return {
+    series: computed,
+    portfolioReturn,
+    vtiReturn,
+  };
+}
 
 
 type PriceFetchAttemptLog = {
@@ -303,9 +348,33 @@ function buildCloseAdjMaps(): { closeByTicker: Map<string, PriceSeries>; adjByTi
   return { closeByTicker, adjByTicker };
 }
 
-/** Renders the chart with current valueMode (no recompute). */
+/** Renders the chart with current viewMode, valueMode (no recompute). */
 function renderChartWithCurrentView(series: ComputedSeries): void {
-  renderChart(series, { valueMode });
+  if (viewMode === 'trend') {
+    renderYearlySummary(null);
+    renderChart(series, {
+      valueMode,
+      title: '整體走勢（含歷年累積）',
+      useDataZoom: true,
+    });
+    return;
+  }
+  const yearly = computeYearlyReturns(viewMode);
+  if (!yearly) {
+    renderYearlySummary(null);
+    renderChart(series, { valueMode, useDataZoom: true });
+    return;
+  }
+  renderYearlySummary({
+    portfolioReturn: yearly.portfolioReturn,
+    vtiReturn: yearly.vtiReturn,
+    valueMode,
+  });
+  renderChart(yearly.series, {
+    valueMode,
+    title: `${viewMode} 年度新增投入（僅該年買入，無前期累積）`,
+    useDataZoom: false,
+  });
 }
 
 function recomputeAndRender(): void {
@@ -326,7 +395,7 @@ function recomputeAndRender(): void {
     renderChartRules();
 }
 
-/** Updates chart + rules/fetch report with cached data (no recompute). Use after valueMode change. */
+/** Updates chart + rules/fetch report with cached data (no recompute). Use after valueMode/viewMode change. */
 function updateChartView(): void {
   if (!cachedComputed) return;
   renderChartWithCurrentView(cachedComputed);
@@ -344,6 +413,13 @@ function renderToggles(): void {
   renderValueModeToggle(valueMode, (m) => {
     if (valueMode === m) return;
     valueMode = m;
+    renderToggles();
+    updateChartView();
+  });
+  const years = cachedEvents ? getYearsFromEvents(cachedEvents) : [];
+  renderViewModeButtons(years, viewMode, (v) => {
+    if (viewMode === v) return;
+    viewMode = v;
     renderToggles();
     updateChartView();
   });
