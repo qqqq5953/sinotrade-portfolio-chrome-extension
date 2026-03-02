@@ -1,4 +1,4 @@
-import { PRIMARY_COLOR } from '../extension/tableMount';
+import { PRIMARY_COLOR } from '../extension/ui/extensionUI';
 import { formatNumber, formatPercent } from './number';
 import type { ComputedSeries } from './types';
 

@@ -1,7 +1,7 @@
 import * as echarts from 'echarts';
 import { buildEchartsOption, type ComputedSeries } from '../core';
 import { mustQuery } from './dom';
-import { WRAPPER_ID } from './tableMount';
+import { WRAPPER_ID } from './ui/extensionUI';
 
 function ensureChartContainer(): HTMLDivElement {
   const tagArea = mustQuery<HTMLElement>(document, '#TagSelectArea');

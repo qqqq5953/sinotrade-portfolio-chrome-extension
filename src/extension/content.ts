@@ -20,27 +20,19 @@ import {
   yearRangeText
 } from './collector';
 import { renderChart } from './chartMount';
+import { setChartBlockParent, WRAPPER_ID, type PriceMode, type ValueMode, type ViewMode } from './ui/extensionUI';
 import {
   mountAccordion,
   setAccordionBodyLoading,
   setAccordionStatusText,
   setAccordionStatusError,
-  setChartBlockParent,
   openAccordion,
   setAccordionExpandCallback,
-  renderChartRules,
   setDailyDetailDataProvider,
   setDailyDetailButtonVisible,
-  renderPriceFetchReport,
-  renderPriceModeToggle,
-  renderValueModeToggle,
-  renderViewModeButtons,
-  renderYearlySummary,
-  WRAPPER_ID,
-  type PriceMode,
-  type ValueMode,
-  type ViewMode,
-} from './tableMount';
+} from './ui/accordionMount';
+import { renderPriceModeToggle, renderValueModeToggle, renderViewModeButtons, renderYearlySummary } from './ui/chartControls';
+import { renderChartRules, renderPriceFetchReport } from './ui/chartReport';
 import {
   getBuyEvents,
   setBuyEvents,
