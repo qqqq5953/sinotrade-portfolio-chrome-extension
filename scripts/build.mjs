@@ -26,8 +26,18 @@ const manifest = {
       run_at: 'document_idle'
     }
   ],
+  icons: {
+    '16': 'icon16.png',
+    '32': 'icon32.png',
+    '192': 'icon192.png'
+  },
   action: {
-    default_title: '豐存股交易折線圖'
+    default_title: '豐存股交易折線圖',
+    default_icon: {
+      '16': 'icon16.png',
+      '32': 'icon32.png',
+      '192': 'icon192.png'
+    }
   }
 };
 
@@ -64,3 +74,6 @@ await build({
 
 await copyFile(path.join(root, 'public', 'demo.html'), path.join(dist, 'demo.html'));
 await copyFile(path.join(root, 'public', 'demo.css'), path.join(dist, 'demo.css'));
+await copyFile(path.join(root, 'public', 'icon16.png'), path.join(dist, 'icon16.png'));
+await copyFile(path.join(root, 'public', 'icon32.png'), path.join(dist, 'icon32.png'));
+await copyFile(path.join(root, 'public', 'icon192.png'), path.join(dist, 'icon192.png'));
