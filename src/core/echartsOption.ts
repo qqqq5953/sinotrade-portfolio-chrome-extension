@@ -148,13 +148,13 @@ export function buildEchartsOption(
         },
         tooltip: { trigger: 'axis', formatter: tooltipFormatter },
         legend: {
-            data: valueMode === 'excess' ? ['超額報酬 %'] : ['portfolio', 'vti'],
-            bottom: useDataZoom ? '14%' : '0%',
+            data: valueMode === 'excess' ? ['相對於 VTI 投資組合的超額報酬 %'] : ['原始投資組合', 'VTI 投資組合'],
+            top: '16%'
         },
         grid: {
             left: '0%',
             right: '1%',
-            bottom: useDataZoom ? '24%' : '12%',
+            top: '26%',
             containLabel: true,
         },
         toolbox: {
@@ -176,51 +176,52 @@ export function buildEchartsOption(
         },
         xAxis: {
             type: 'time',
-            boundaryGap: false
+            boundaryGap: false,
+            axisLabel: { color: PRIMARY_COLOR },
         },
         yAxis:
             valueMode === 'amount'
-                ? { type: 'value' }
+                ? { type: 'value', axisLabel: { color: PRIMARY_COLOR } }
                 : valueMode === 'percent'
-                ? {
-                    type: 'value',
-                    axisLabel: { formatter: (v: number) => `${v}%`, margin: 8 },
-                    name: '累積報酬 %',
-                    nameGap: 20,
-                    nameTextStyle: { align: 'center', padding: [0, 20, 0, 0] },
+                    ? {
+                        type: 'value',
+                        axisLabel: { formatter: (v: number) => `${v}%`, margin: 8, color: PRIMARY_COLOR },
+                        name: '累積報酬 %',
+                        nameGap: 20,
+                        nameTextStyle: { align: 'center', padding: [0, 0, 0, 6], color: '#6b7280' },
                     }
-                : {
-                    type: 'value',
-                    axisLabel: { formatter: (v: number) => `${v}%`, margin: 8 },
-                    name: '超額報酬 %',
-                    nameGap: 20,
-                    nameTextStyle: { align: 'center', padding: [0, 12, 0, 0] },
+                    : {
+                        type: 'value',
+                        axisLabel: { formatter: (v: number) => `${v}%`, margin: 8, color: PRIMARY_COLOR },
+                        name: '超額報酬 %',
+                        nameGap: 20,
+                        nameTextStyle: { align: 'center', padding: [0, 0, 0, 12], color: '#6b7280' },
                     },
         series: [
-        {
-            name: valueMode === 'excess' ? '超額報酬 %' : 'portfolio',
-            type: 'line',
-            showSymbol: false,
-            clip: false,
-            symbolSize: 10,
-            lineStyle: { color: '#f45a4c', width: 1.5, opacity: 1 },
-            itemStyle: { color: '#f45a4c' },
-            data: portfolioData,
-        },
-        {
-            name: valueMode === 'excess' ? 'baseline' : 'vti',
-            type: 'line',
-            showSymbol: false,
-            clip: false,
-            symbolSize: 10,
-            lineStyle: {
-            color: CHART_PRIMARY_COLOR,
-            width: 1.5,
-            opacity: valueMode === 'excess' ? 0 : 1,
+            {
+                name: valueMode === 'excess' ? '相對於 VTI 投資組合的超額報酬 %' : '原始投資組合',
+                type: 'line',
+                showSymbol: false,
+                clip: false,
+                symbolSize: 10,
+                lineStyle: { color: '#f45a4c', width: 1.5, opacity: 1 },
+                itemStyle: { color: '#f45a4c' },
+                data: portfolioData,
             },
-            itemStyle: { color: CHART_PRIMARY_COLOR },
-            data: vtiData,
-        },
+            {
+                name: valueMode === 'excess' ? 'baseline' : 'VTI 投資組合',
+                type: 'line',
+                showSymbol: false,
+                clip: false,
+                symbolSize: 10,
+                lineStyle: {
+                color: CHART_PRIMARY_COLOR,
+                width: 1.5,
+                opacity: valueMode === 'excess' ? 0 : 1,
+                },
+                itemStyle: { color: CHART_PRIMARY_COLOR },
+                data: vtiData,
+            },
         ],
     };
 
