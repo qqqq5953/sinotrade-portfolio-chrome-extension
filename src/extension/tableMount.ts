@@ -843,11 +843,11 @@ export function renderYearlySummary(data: {
   if (data.valueMode === 'amount') {
     const p = formatNumber(data.lastPortfolio);
     const v = formatNumber(data.lastVti);
-    text = `投資組合：${p} | VTI 組合：${v}`;
+    text = `投資組合：${p}&emsp;|&emsp;VTI 組合：${v}`;
   } else if (data.valueMode === 'percent') {
     const pRet = formatPercent(data.portfolioReturn * 100);
     const vRet = formatPercent(data.vtiReturn * 100);
-    text = `投資組合：${pRet} | VTI 組合：${vRet}`;
+    text = `投資組合：${pRet}&emsp;|&emsp;VTI 組合：${vRet}`;
   } else {
     const lp = data.lastPortfolio;
     const lv = data.lastVti;
@@ -941,8 +941,8 @@ export function renderPriceModeToggle(mode: PriceMode, onChange: (mode: PriceMod
 
 const VALUE_MODE_TOOLTIPS: Record<ValueMode, string> = {
   amount: '投資組合與 VTI 組合的市值',
-  percent: '投資組合與 VTI 組合的累積報酬率 = (市值 / 累積投入金額 - 1) × 100%',
-  excess: '投資組合相對 VTI 組合的超額績效 = (投資組合市值 / VTI 組合市值 - 1) × 100%',
+  percent: '投資組合與 VTI 組合的累積報酬 % = (市值 / 累積投入金額 - 1) × 100%',
+  excess: '投資組合相對 VTI 組合的超額報酬 % = (投資組合市值 / VTI 組合市值 - 1) × 100%',
 };
 
 export function renderValueModeToggle(mode: ValueMode, onChange: (mode: ValueMode) => void): void {
@@ -950,8 +950,8 @@ export function renderValueModeToggle(mode: ValueMode, onChange: (mode: ValueMod
     const tooltip = VALUE_MODE_TOOLTIPS[mode];
     valueRow.innerHTML = `
         <div class="btn-group">
-            <button class="btn" data-vmode="excess" type="button" title="超額績效% = (投資組合市值 / VTI 市值 - 1) × 100%（相對 VTI 的超額績效%）">超額績效%</button>
-            <button class="btn" data-vmode="percent" type="button" title="累積報酬率% = (市值 / 累積投入金額 - 1) × 100%（投資組合與 VTI 皆以各自市值計）">累積報酬率%</button>
+            <button class="btn" data-vmode="excess" type="button" title="超額報酬 % = (投資組合市值 / VTI 市值 - 1) × 100%（相對 VTI 的超額報酬 %）">超額報酬 %</button>
+            <button class="btn" data-vmode="percent" type="button" title="累積報酬 % = (市值 / 累積投入金額 - 1) × 100%（投資組合與 VTI 皆以各自市值計）">累積報酬 %</button>
             <button class="btn" data-vmode="amount" type="button" title="顯示投資組合與 VTI 的市值（金額）">市值</button>
         </div>
         <div class="pvs-hint-info" title="${tooltip.replace(/"/g, '&quot;')}" aria-label="說明"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg></div>

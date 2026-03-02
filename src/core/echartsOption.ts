@@ -148,7 +148,7 @@ export function buildEchartsOption(
         },
         tooltip: { trigger: 'axis', formatter: tooltipFormatter },
         legend: {
-            data: valueMode === 'excess' ? ['超額績效 %'] : ['portfolio', 'vti'],
+            data: valueMode === 'excess' ? ['超額報酬 %'] : ['portfolio', 'vti'],
             bottom: useDataZoom ? '14%' : '0%',
         },
         grid: {
@@ -192,13 +192,13 @@ export function buildEchartsOption(
                 : {
                     type: 'value',
                     axisLabel: { formatter: (v: number) => `${v}%`, margin: 8 },
-                    name: '超額績效 %',
+                    name: '超額報酬 %',
                     nameGap: 20,
                     nameTextStyle: { align: 'center', padding: [0, 12, 0, 0] },
                     },
         series: [
         {
-            name: valueMode === 'excess' ? '超額績效 %' : 'portfolio',
+            name: valueMode === 'excess' ? '超額報酬 %' : 'portfolio',
             type: 'line',
             showSymbol: false,
             clip: false,
