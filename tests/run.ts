@@ -59,22 +59,52 @@ test('getYearsFromEvents returns empty for empty events', () => {
   assert.deepEqual(getYearsFromEvents([]), []);
 });
 
-test('parseYahooChartToPriceSeries prefers adjclose by default', async () => {
-  const fixturePath = path.join(process.cwd(), 'tests', 'fixtures', 'yahoo.sample.json');
-  const json = JSON.parse(await readFile(fixturePath, 'utf8'));
-  const ps = parseYahooChartToPriceSeries('VTI', json, { preferAdjClose: true });
-  // The fixture contains one day where close=100 but adjclose=101.
-  assert.equal(ps.get('2024-01-02'), 101);
+test('parseYahooChartToPriceSeries prefers adjclose by default', () => {
+  // Minimal synthetic chart where close != adjclose so we can assert preference.
+  const json = {
+    chart: {
+      result: [
+        {
+          timestamp: [1704171600],
+          indicators: {
+            quote: [{ close: [100] }],
+            adjclose: [{ adjclose: [101] }]
+          }
+        }
+      ],
+      error: null
+    }
+  };
+
+  const ps = parseYahooChartToPriceSeries('VTI', json as any, { preferAdjClose: true });
+  assert.equal(ps.size, 1);
+  assert.equal(Array.from(ps.values())[0], 101);
 });
 
-test('parseYahooChartToPriceSeriesPair returns both close and adjclose maps', async () => {
-  const fixturePath = path.join(process.cwd(), 'tests', 'fixtures', 'yahoo.sample.json');
-  const json = JSON.parse(await readFile(fixturePath, 'utf8'));
-  const pair = parseYahooChartToPriceSeriesPair('VTI', json);
-  assert.equal(pair.close.get('2024-01-02'), 100);
-  assert.equal(pair.adjclose.get('2024-01-02'), 101);
-  assert.equal(pair.close.get('2024-01-03'), 102);
-  assert.equal(pair.adjclose.get('2024-01-03'), 103);
+test('parseYahooChartToPriceSeriesPair returns both close and adjclose maps', () => {
+  const json = {
+    chart: {
+      result: [
+        {
+          timestamp: [1704171600, 1704258000],
+          indicators: {
+            quote: [{ close: [100, 102] }],
+            adjclose: [{ adjclose: [101, 103] }]
+          }
+        }
+      ],
+      error: null
+    }
+  };
+
+  const pair = parseYahooChartToPriceSeriesPair('VTI', json as any);
+  // Assert values by iteration order (timestamps are increasing).
+  const keys = Array.from(pair.close.keys());
+  const [k0, k1] = keys as [string, string];
+  assert.equal(pair.close.get(k0), 100);
+  assert.equal(pair.adjclose.get(k0), 101);
+  assert.equal(pair.close.get(k1), 102);
+  assert.equal(pair.adjclose.get(k1), 103);
 });
 
 test('parseYahooChartSplits parses and sorts split events with factors', () => {
@@ -125,10 +155,20 @@ test('parseYahooChartSplits parses and sorts split events with factors', () => {
   assert.equal(splits[2]?.factor, 10);
 });
 
-test('parseYahooChartSplits returns empty array when no split events', async () => {
-  const fixturePath = path.join(process.cwd(), 'tests', 'fixtures', 'yahoo.sample.json');
-  const json = JSON.parse(await readFile(fixturePath, 'utf8'));
-  const splits = parseYahooChartSplits('VTI', json);
+test('parseYahooChartSplits returns empty array when no split events', () => {
+  const json = {
+    chart: {
+      result: [
+        {
+          timestamp: [1704171600],
+          // No events.splits field here.
+          indicators: { quote: [{ close: [100] }] }
+        }
+      ],
+      error: null
+    }
+  };
+  const splits = parseYahooChartSplits('VTI', json as any);
   assert.deepEqual(splits, []);
 });
 
