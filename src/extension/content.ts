@@ -74,14 +74,22 @@ async function isExtensionEnabledForTransaction(): Promise<boolean> {
 if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
   chrome.runtime.onMessage.addListener((msg: unknown) => {
     const m = msg as { type?: string } | null;
-    if (!m || m.type !== 'PVS_DISABLE_NOW') return;
-    disabledForThisPage = true;
+    if (!m || !m.type) return;
 
-    // 收掉目前頁面上的 UI：accordion、wrapper、chart、狀態遮罩。
-    document.getElementById('pvs-accordion')?.remove();
-    document.getElementById(WRAPPER_ID)?.remove();
-    document.getElementById('chart')?.remove();
-    document.getElementById('portfolio-vti-status')?.remove();
+    if (m.type === 'PVS_DISABLE_NOW') {
+      disabledForThisPage = true;
+      // 收掉目前頁面上的 UI：accordion、wrapper、chart、狀態遮罩。
+      document.getElementById('pvs-accordion')?.remove();
+      document.getElementById(WRAPPER_ID)?.remove();
+      document.getElementById('chart')?.remove();
+      document.getElementById('portfolio-vti-status')?.remove();
+    } else if (m.type === 'PVS_ENABLE_NOW') {
+      disabledForThisPage = false;
+      // 若目前就在交易頁，且尚未掛載 accordion，立即啟動。
+      if (isTransactionBuyPage() && !document.getElementById('pvs-accordion')) {
+        initBuyPage();
+      }
+    }
   });
 }
 

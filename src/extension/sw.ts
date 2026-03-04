@@ -122,16 +122,18 @@ chrome.action?.onClicked.addListener(async (tab: any) => {
   const current = await getEnabledForTransaction();
   const next = !current;
   await setEnabledForTransaction(next);
-  if (!next) {
-    // 通知目前分頁的 content script 收掉 UI，但不打斷正在執行的流程。
-    try {
-      chrome.tabs.sendMessage(tabId, { type: 'PVS_DISABLE_NOW' }, () => {
+  try {
+    // 通知目前分頁的 content script 立即更新 UI 狀態。
+    chrome.tabs.sendMessage(
+      tabId,
+      { type: next ? 'PVS_ENABLE_NOW' : 'PVS_DISABLE_NOW' },
+      () => {
         // 忽略沒有 content script 的錯誤。
         void chrome.runtime.lastError;
-      });
-    } catch {
-      // ignore
-    }
+      }
+    );
+  } catch {
+    // ignore
   }
   await updateActionForTab(tabId, url);
 });
