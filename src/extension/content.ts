@@ -52,10 +52,21 @@ const BUY_INPUT_ID = 'BuyInfo_QueryDateRange';
 const BUY_TABLE_SELECTOR = '.query-result-area .buy-table-area table.buy-table.default-table.h5';
 
 const TRANSACTION_URL = 'https://aiinvest.sinotrade.com.tw/Account/Transaction';
+const STORAGE_KEY_ENABLED = 'pvs_enabled_for_transaction';
 
 function isTransactionBuyPage(): boolean {
   if (!window.location.href.startsWith(TRANSACTION_URL)) return false;
   return document.querySelector(`#${BUY_INPUT_ID}`) != null;
+}
+
+async function isExtensionEnabledForTransaction(): Promise<boolean> {
+  if (typeof chrome === 'undefined' || !chrome?.storage?.local) return true;
+  return new Promise((resolve) => {
+    chrome.storage.local.get([STORAGE_KEY_ENABLED], (items: Record<string, unknown>) => {
+      const raw = items?.[STORAGE_KEY_ENABLED];
+      resolve(raw !== false);
+    });
+  });
 }
 
 function uniq<T>(arr: T[]): T[] {
@@ -707,7 +718,10 @@ function initBuyPage(): void {
   });
 }
 
-initBuyPage();
+isExtensionEnabledForTransaction().then((enabled) => {
+  if (!enabled) return;
+  initBuyPage();
+});
 
 // Manual stop/reset: clears persisted state so refresh won't resume.
 window.addEventListener(getStopEventName(), () => {
