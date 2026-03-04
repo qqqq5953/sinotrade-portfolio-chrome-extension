@@ -54,6 +54,8 @@ const BUY_TABLE_SELECTOR = '.query-result-area .buy-table-area table.buy-table.d
 const TRANSACTION_URL = 'https://aiinvest.sinotrade.com.tw/Account/Transaction';
 const STORAGE_KEY_ENABLED = 'pvs_enabled_for_transaction';
 
+let disabledForThisPage = false;
+
 function isTransactionBuyPage(): boolean {
   if (!window.location.href.startsWith(TRANSACTION_URL)) return false;
   return document.querySelector(`#${BUY_INPUT_ID}`) != null;
@@ -66,6 +68,20 @@ async function isExtensionEnabledForTransaction(): Promise<boolean> {
       const raw = items?.[STORAGE_KEY_ENABLED];
       resolve(raw !== false);
     });
+  });
+}
+
+if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
+  chrome.runtime.onMessage.addListener((msg: unknown) => {
+    const m = msg as { type?: string } | null;
+    if (!m || m.type !== 'PVS_DISABLE_NOW') return;
+    disabledForThisPage = true;
+
+    // 收掉目前頁面上的 UI：accordion、wrapper、chart、狀態遮罩。
+    document.getElementById('pvs-accordion')?.remove();
+    document.getElementById(WRAPPER_ID)?.remove();
+    document.getElementById('chart')?.remove();
+    document.getElementById('portfolio-vti-status')?.remove();
   });
 }
 
@@ -525,6 +541,7 @@ async function computeAndRender(events: any[]): Promise<void> {
 }
 
 async function startFlow(): Promise<void> {
+  if (disabledForThisPage) return;
   const startedAt = Date.now();
   const startYear = getMinDateYearFromPage(BUY_INPUT_ID);
   const endYear = new Date().getFullYear();
@@ -627,6 +644,7 @@ async function resumeIfNeeded(): Promise<boolean> {
 }
 
 async function runOnAccordionExpand(body: HTMLDivElement): Promise<void> {
+  if (disabledForThisPage) return;
   setAccordionBodyLoading(true);
   setChartBlockParent(body);
   try {
@@ -664,6 +682,7 @@ function initBuyPage(): void {
 
   const { body } = mountAccordion({
     onUpdate: () => {
+      if (disabledForThisPage) return;
       setAccordionBodyLoading(true);
       startFlow();
     }

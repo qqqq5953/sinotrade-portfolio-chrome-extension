@@ -92,7 +92,9 @@ async function updateActionForTab(tabId: number, url: string | undefined | null)
   const enabled = await getEnabledForTransaction();
   await chrome.action.setTitle({
     tabId,
-    title: enabled ? '豐存股交易折線圖（此網站已啟用）' : '豐存股交易折線圖（此網站已停用）'
+    title: enabled
+      ? '豐存股交易折線圖（此網站已啟用）'
+      : '豐存股交易折線圖（本次執行結束後將停用此網站）'
   });
   await chrome.action.setBadgeText({ tabId, text: enabled ? 'ON' : 'OFF' });
   await chrome.action.setBadgeBackgroundColor({
@@ -120,6 +122,17 @@ chrome.action?.onClicked.addListener(async (tab: any) => {
   const current = await getEnabledForTransaction();
   const next = !current;
   await setEnabledForTransaction(next);
+  if (!next) {
+    // 通知目前分頁的 content script 收掉 UI，但不打斷正在執行的流程。
+    try {
+      chrome.tabs.sendMessage(tabId, { type: 'PVS_DISABLE_NOW' }, () => {
+        // 忽略沒有 content script 的錯誤。
+        void chrome.runtime.lastError;
+      });
+    } catch {
+      // ignore
+    }
+  }
   await updateActionForTab(tabId, url);
 });
 
