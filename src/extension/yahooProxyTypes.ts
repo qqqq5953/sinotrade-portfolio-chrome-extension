@@ -1,4 +1,4 @@
-import type{ YahooChartResponse } from "../core/yahoo";
+import type{ YahooChartResponse } from "../core/integration/yahoo";
 
 export type YahooProxyError = {
     kind: 'http' | 'network' | 'unknown';

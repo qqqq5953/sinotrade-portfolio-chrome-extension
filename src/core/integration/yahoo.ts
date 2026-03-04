@@ -1,6 +1,6 @@
-import { isoDateToUtcSeconds } from './date';
-import { specError } from './errors';
-import type { PriceSeries } from './types';
+import { isoDateToUtcSeconds } from '../utils/date';
+import { specError } from '../utils/errors';
+import type { PriceSeries } from '../domain/types';
 
 export interface YahooFetchRange {
   /** ISO date, e.g. "2024-01-01" */

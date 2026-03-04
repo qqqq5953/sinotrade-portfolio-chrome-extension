@@ -1,4 +1,4 @@
-import { specError } from './errors';
+import { specError } from '../utils/errors';
 
 export function parseNumberStrict(raw: string, ctx?: Record<string, unknown>): number {
   const s = raw.replace(/\s+/g, '').replace(/,/g, '');
@@ -24,3 +24,7 @@ export function formatPercent(n: unknown): string {
     const sign = n > 0 ? '+' : '';
     return `${sign}${n.toLocaleString('en-US', { maximumFractionDigits: 2 })}%`;
 }
+
+export function pad2(n: number): string {
+    return String(n).padStart(2, '0');
+  }

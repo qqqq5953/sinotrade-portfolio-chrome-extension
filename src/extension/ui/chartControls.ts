@@ -1,7 +1,7 @@
 /**
  * Chart controls: price/value mode toggles, view mode buttons, yearly summary.
  */
-import { formatNumber, formatPercent } from '../../core/number';
+import { formatNumber, formatPercent } from '../../core/utils/number';
 import {
   ensureStyle,
   ensurePvsWrapper,

@@ -1,6 +1,5 @@
-import type { TradeEvent } from '../core';
-import type { PriceSeries } from '../core';
-import type { YahooSplitEvent } from '../core';
+import type { TradeEvent, PriceSeries } from '../core/domain/types';
+import type { YahooSplitEvent } from '../core/integration/yahoo';
 
 const DB_NAME = 'pvs-cache-v1';
 const DB_VERSION = 1;

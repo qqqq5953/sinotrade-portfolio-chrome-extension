@@ -2,18 +2,18 @@ import { strict as assert } from 'node:assert';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 
+import { computePortfolioVsVtiSeries } from '../src/core/domain/compute';
+import { getYearsFromEvents } from '../src/core/domain/viewMode';
+import { normalizeBuyEventsBySplits } from '../src/core/domain/splits';
+import { parseNumberStrict } from '../src/core/utils/number';
 import {
-  computePortfolioVsVtiSeries,
-  getYearsFromEvents,
-  normalizeBuyEventsBySplits,
-  parseNumberStrict,
   parseYahooChartSplits,
   parseYahooChartToPriceSeries,
-  parseYahooChartToPriceSeriesPair,
-  toIsoDateETFromYmdSlash
-} from '../src/core';
-import type { YahooSplitEvent } from '../src/core';
-import type { PriceSeries, TradeEvent } from '../src/core/types';
+  parseYahooChartToPriceSeriesPair
+} from '../src/core/integration/yahoo';
+import { toIsoDateETFromYmdSlash } from '../src/core/utils/date';
+import type { YahooSplitEvent } from '../src/core/integration/yahoo';
+import type { PriceSeries, TradeEvent } from '../src/core/domain/types';
 
 type TestFn = () => void | Promise<void>;
 const tests: { name: string; fn: TestFn }[] = [];

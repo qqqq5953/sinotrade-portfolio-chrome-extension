@@ -1,4 +1,4 @@
-import type { TradeEvent } from '../core';
+import type { TradeEvent } from '../core/domain/types';
 
 const KEY = 'portfolio-vti-run-state-v1';
 

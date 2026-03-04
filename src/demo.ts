@@ -1,6 +1,8 @@
 import * as echarts from 'echarts';
-import { computePortfolioVsVtiSeries, buildEchartsOption, parseBuyTable } from './core';
-import type { PriceSeries } from './core/types';
+import { computePortfolioVsVtiSeries } from './core/domain/compute';
+import { parseBuyTable } from './core/integration/domParse';
+import { buildEchartsOption } from './extension/ui/echartsOption';
+import type { PriceSeries } from './core/domain/types';
 
 function must<T extends Element>(selector: string): T {
   const el = document.querySelector(selector);

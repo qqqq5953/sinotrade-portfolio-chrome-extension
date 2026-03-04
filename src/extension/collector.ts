@@ -1,5 +1,6 @@
-import { parseBuyTable, type TradeEvent } from '../core';
-import { specError } from '../core/errors';
+import { parseBuyTable } from '../core/integration/domParse';
+import type { TradeEvent } from '../core/domain/types';
+import { specError } from '../core/utils/errors';
 import { mustQuery, dispatchEnter, sleep, waitFor } from './dom';
 
 function formatYmd(year: number, month: number, day: number): string {

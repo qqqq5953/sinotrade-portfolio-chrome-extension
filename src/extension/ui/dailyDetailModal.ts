@@ -1,7 +1,9 @@
 /**
  * Daily detail modal: opens a modal with per-day breakdown table.
  */
-import { formatNumber, type DebugDayRow, type PriceSeries } from '../../core';
+import { formatNumber } from '../../core/utils/number';
+import type { DebugDayRow } from '../../core/domain/computeDebug';
+import type { PriceSeries } from '../../core/domain/types';
 import {
   ensureStyle,
   MODAL_OVERLAY_ID,

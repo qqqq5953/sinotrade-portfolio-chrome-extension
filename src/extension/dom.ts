@@ -1,4 +1,4 @@
-import { specError } from '../core/errors';
+import { specError } from '../core/utils/errors';
 
 export function mustQuery<T extends Element>(root: ParentNode, selector: string): T {
   const el = root.querySelector(selector);

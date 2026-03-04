@@ -1,5 +1,5 @@
 import type { TradeEvent } from './types';
-import type { YahooSplitEvent } from './yahoo';
+import type { YahooSplitEvent } from '../integration/yahoo';
 
 /**
  * Normalize BUY shares to current share basis by applying split factors that

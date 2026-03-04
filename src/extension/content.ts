@@ -1,15 +1,10 @@
-import {
-  computePortfolioVsVtiSeriesWithDebug,
-  getYearsFromEvents,
-  normalizeBuyEventsBySplits,
-  parseYahooChartToPriceSeriesPair,
-  parseYahooChartSplits,
-  type ComputedSeries,
-  type YahooSplitEvent,
-  type PriceSeries,
-  type TradeEvent
-} from '../core';
-import { specError } from '../core/errors';
+import { computePortfolioVsVtiSeriesWithDebug } from '../core/domain/computeDebug';
+import { getYearsFromEvents } from '../core/domain/viewMode';
+import { normalizeBuyEventsBySplits } from '../core/domain/splits';
+import { parseYahooChartToPriceSeriesPair, parseYahooChartSplits } from '../core/integration/yahoo';
+import type { ComputedSeries, PriceSeries, TradeEvent } from '../core/domain/types';
+import type { YahooSplitEvent } from '../core/integration/yahoo';
+import { specError } from '../core/utils/errors';
 import {
   dedupeEvents,
   parseBuyEventsFromTable,
@@ -19,7 +14,7 @@ import {
   waitForTableOrNoData,
   yearRangeText
 } from './collector';
-import { renderChart } from './chartMount';
+import { renderChart } from './ui/chartMount';
 import { setChartBlockParent, WRAPPER_ID, type PriceMode, type ValueMode, type ViewMode } from './ui/extensionUI';
 import {
   mountAccordion,

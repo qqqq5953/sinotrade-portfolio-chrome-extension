@@ -2,7 +2,8 @@
  * Shared UI infrastructure: styles, layout helpers, constants.
  * Other UI modules (accordion, modal, controls, report) depend on this.
  */
-import type { DebugDayRow, PriceSeries } from '../../core';
+import type { DebugDayRow } from '../../core/domain/computeDebug';
+import type { PriceSeries } from '../../core/domain/types';
 
 const STYLE_ID = 'pvs-debug-table-style';
 export const TABLE_ID = 'pvs-debug-table';

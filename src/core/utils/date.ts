@@ -1,8 +1,5 @@
 import { specError } from './errors';
-
-export function pad2(n: number): string {
-  return String(n).padStart(2, '0');
-}
+import { pad2 } from './number';
 
 export function toIsoDateETFromYmdSlash(tradeDate: string, ctx?: Record<string, unknown>): string {
   const m = tradeDate.match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);

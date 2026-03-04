@@ -1,7 +1,7 @@
-import { toIsoDateETFromYmdSlash } from './date';
-import { specError } from './errors';
-import { parseNumberStrict } from './number';
-import type { TradeEvent, TradeType } from './types';
+import { toIsoDateETFromYmdSlash } from '../utils/date';
+import { specError } from '../utils/errors';
+import { parseNumberStrict } from '../utils/number';
+import type { TradeEvent, TradeType } from '../domain/types';
 
 function normalizeText(s: string): string {
   return s.replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
