@@ -59,12 +59,6 @@ export async function setDateRangeInput(inputId: string, rangeText: string): Pro
   // Keep Enter as a best-effort trigger (some pages listen on key events).
   dispatchEnter(input);
   await sleep(0);
-  try {
-    localStorage.setItem(
-      `pvs_debug_lastRange_${inputId}`,
-      JSON.stringify({ at: Date.now(), tried: rangeText, actual: String(input.value) })
-    );
-  } catch {}
 }
 
 export function triggerSubmitForm(): void {

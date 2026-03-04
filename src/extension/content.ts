@@ -607,9 +607,6 @@ async function resumeIfNeeded(): Promise<boolean> {
         : [];
 
     const merged = dedupeEvents([...(state.buyEvents ?? []), ...yearEvents]);
-    try {
-      localStorage.setItem('pvs_debug_buyEvents_v1', JSON.stringify({ at: Date.now(), buy: merged }));
-    } catch {}
 
     if (y < state.endYear) {
       const nextYear = y + 1;
@@ -625,9 +622,6 @@ async function resumeIfNeeded(): Promise<boolean> {
 
     // BUY-only: compute immediately after finishing buy collection.
     const events: TradeEvent[] = merged;
-    try {
-      localStorage.setItem('pvs_debug_events_v1', JSON.stringify({ at: Date.now(), events, mode: 'BUY_ONLY' }));
-    } catch {}
 
     await setBuyEvents(state.startYear, state.endYear, events);
 
