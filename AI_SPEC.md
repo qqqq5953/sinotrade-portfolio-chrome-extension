@@ -6,7 +6,7 @@
   - `portfolio`：投資組合在「每個交易日（有交易事件的日子）」的**收盤市值**
   - `vti`：以平行時空規則模擬 VTI，在相同交易日的**收盤市值**
 - **範圍內**：
-  - 從頁面 UI 依年度篩選抓取買入/賣出歷史交易表格
+  - 從頁面 UI 依年度篩選抓取買入歷史交易表格
   - 透過 Yahoo Finance 取得股價日 K（`interval=1d`）收盤價
   - 從 Yahoo `events=split` 取得拆股事件，對 BUY 事件股數做拆股還原（以目前股本基準）
   - 合併事件、計算兩條序列、渲染圖表並插入到指定 DOM
@@ -20,11 +20,11 @@
 ## 2) 名詞與資料字典
 
 - **tradeDate**：交易事件發生日期（以美股交易日為主；格式與時區需明確，見第 10 節）。
-- **TradeEvent**：從頁面表格解析出的單筆買入或賣出事件。
+- **TradeEvent**：從頁面表格解析出的單筆買入事件（本版僅使用 BUY）。
 - **portfolioValue(tradeDate)**：在 `tradeDate` 當日收盤後，持倉依收盤價估值的總市值。
 - **VTI parallel trading**（平行時空 VTI 規則，已確認）：
   - 買入事件：用同日「投入成本」等值金額，在當日收盤價買入 VTI（允許小數股）。
-  - 賣出事件：用同日「交割金額」等值金額，在當日收盤價賣出 VTI（允許小數股，不管實際賣出原股幾股）。
+  - 本版採 BUY-only 模式，不處理賣出事件。
 
 ### 2.1 BUY-only 增量投入比較模式（本版實作）
 
@@ -60,7 +60,7 @@
   - 頁面在 daterangepicker callback 會呼叫 `SubmitForm()`；自動化需在設定 input value 後主動呼叫：
     - 優先：`window.SubmitForm()`（若存在）
     - 否則：提交 `#form1`（`requestSubmit()` / `submit()`）
-  - **注意**：`SubmitForm()/form.submit()` 會觸發**整頁 reload**，因此不能用「單次 JS 執行中 for-loop 逐年抓取」；必須採用「分段與恢復」狀態機（見 3.3 與 9.3）。
+  - **注意**：`SubmitForm()/form.submit()` 會觸發**整頁 reload**，因此不能用「單次 JS 執行中 for-loop 逐年抓取」；必須採用「分段與恢復」狀態機（見 9.3）。
 
 ### 3.2 買入頁（Buy）
 
@@ -69,26 +69,13 @@
   - `.query-result-area .buy-table-area table.buy-table.default-table.h5`
 - **表頭（用於欄位映射）**：固定包含「成交日 / 股票名稱 / 成交股 / 投入成本」等欄（見 `RAW_SPEC.md`）。
 
-### 3.3 賣出頁（Sell）
-
-- **切換到賣出標籤**：
-  - `#TagSelectArea` 內找到文字為「賣出」的 `.tag-select-header`（或依 onclick `TagSelectClick(2)`）並點擊。
-- **日期輸入框**：`#SellInfo_QueryDateRange`
-- **結果表格 selector**：
-  - `.query-result-area .sell-table-area table.sell-table.default-table.h5`
-- **表頭（用於欄位映射）**：固定包含「成交日 / 股票名稱 / 成交股 / 交割金額」等欄。
-- **重要限制（切換 tab 可能 reload）**：
-  - 實務上點擊「賣出」tab 可能觸發頁面重新 request / 重載，導致 content script 重新初始化、記憶體狀態遺失。
-  - 因此抓取流程必須支援「分段與恢復」：先抓買入並**持久化暫存**（建議 `chrome.storage.local`；無則退回 `sessionStorage`），再切換到賣出頁；重載後自動從暫存讀回買入資料並繼續抓賣出，最後合併計算並清理暫存。
-  - **補充**：不只切 tab；每次設定日期區間後觸發 `SubmitForm()/form.submit()` 也會整頁 reload，同樣需要分段恢復。
-
-### 3.4 排序、分頁與滾動載入
+### 3.3 排序、分頁與滾動載入
 
 - 篩選結果為 **當年由晚到早排序**：畫面上先看到 12 月，往下捲才會出現 1 月。
 - **需求**：抓到該年度所有列（不遺漏），並可跨年度累積。
 - **建議實作規格（可測）**：
   - 滾動至表格容器底部直到「列數在連續 N 次檢查中不再增加」或出現明確的「無更多資料」訊號。
-  - 抓取後以「(tradeDate, ticker, type, shares, cashAmount)」做去重。
+  - 抓取後以「(tradeDate, ticker, shares, cashAmount)」做去重（本版僅 BUY，無 type）。
 
 ---
 
@@ -105,16 +92,7 @@
   - `shares`：成交股（可為小數）
   - `cash`：投入成本（buyCost；數字可含千分位）
 
-### 4.2 SellRow → TradeEvent
-
-- **必要輸出欄位**：
-  - `type = "SELL"`
-  - `tradeDate`
-  - `ticker`
-  - `shares`
-  - `cash`：交割金額（sellCash；數字可含千分位）
-
-### 4.3 數字與日期解析規格
+### 4.2 數字與日期解析規格
 
 - **日期**：
   - DOM 內可能是 `2024/<br>12/30` → 正規化成 `2024/12/30`
@@ -165,7 +143,7 @@
 ## 6) 資料模型（TypeScript 參考）
 
 ```ts
-export type TradeType = "BUY" | "SELL";
+export type TradeType = "BUY" | "SELL"; // 本版僅使用 BUY
 
 export interface TradeEvent {
   type: TradeType;
@@ -173,7 +151,7 @@ export interface TradeEvent {
   isoDate: string;   // "YYYY-MM-DD"
   ticker: string;    // e.g. "COST"
   shares: number;    // can be fractional
-  cash: number;      // BUY:投入成本, SELL:交割金額
+  cash: number;      // BUY: 投入成本（本版僅此）
   sourceYear: number;
 }
 
@@ -186,12 +164,11 @@ export type Holdings = Map<string, number>; // ticker -> shares
 
 ## 7) 計算定義（核心邏輯；只在交易日點更新）
 
-### 7.1 事件合併與排序
+### 7.1 事件排序
 
-- 解析 `buyEvents[]` 與 `sellEvents[]` 後合併為 `events[]`。
+- 本版僅使用 `buyEvents[]`（BUY-only 模式，不納入賣出）。
 - `events[]` 依 `isoDate` 升冪排序。
-- 同日多筆事件的排序規則（需固定以便測試重現）：
-  - 建議：同日內依「原表格出現順序（由上到下）」或依「BUY 先於 SELL」；需在第 10 節明確定義。
+- 同日多筆事件的排序規則（需固定以便測試重現）：同日內依原表格出現順序（由上到下）。
 
 ### 7.2 價格準備
 
@@ -224,18 +201,12 @@ export type Holdings = Map<string, number>; // ticker -> shares
   - `portfolioHoldings: Holdings = new Map()`
   - `vtiShares = 0`
 - 對每個 `tradeDate`（升冪）：
-  1. 取出當日所有 `dayEvents`
-  2. 先更新 **Portfolio holdings**：
-     - BUY：`holdings[ticker] += shares`
-     - SELL：`holdings[ticker] -= shares`
+  1. 取出當日所有 `dayEvents`（本版僅 BUY）
+  2. 更新 **Portfolio holdings**：BUY → `holdings[ticker] += shares`
   3. 計算 **Portfolio 市值**：
      - \(portfolioValue = \sum_{t \in holdings} shares_t \times close(t, tradeDate)\)
-  4. 更新 **VTI holdings（平行時空）**：
-     - 對 `dayEvents`：
-       - 若 BUY：`vtiShares += event.cash / close("VTI", tradeDate)`
-       - 若 SELL：`vtiShares -= event.cash / close("VTI", tradeDate)`
-  5. 計算 **VTI 市值**：
-     - `vtiValue = vtiShares * close("VTI", tradeDate)`
+  4. 更新 **VTI holdings（平行時空）**：對當日 BUY 事件，`vtiShares += event.cash / close("VTI", tradeDate)`
+  5. 計算 **VTI 市值**：`vtiValue = vtiShares * close("VTI", tradeDate)`
 
 ### 7.4 輸出序列（ECharts）
 
@@ -268,7 +239,7 @@ export type Holdings = Map<string, number>; // ticker -> shares
 - 重入/更新：
   - 若已存在 `#chart`：不得重複插入，應更新圖表 option（或先清理再重建）。
 - 產生狀態顯示（不可用按鈕文字表示）：
-  - 需有獨立的 UI 區塊/面板顯示狀態：`抓取買入中` → `切換賣出中` → `抓取賣出中` → `計算/繪圖中` → `已完成`（失敗則顯示錯誤訊息）。
+  - 需有獨立的 UI 區塊/面板顯示狀態：`抓取買入中` → `計算/繪圖中` → `已完成`（失敗則顯示錯誤訊息）。
   - 按鈕（若存在）僅作為啟動入口，不承擔進度/完成狀態顯示。
 
 ### 8.1 顯示模式（隱私）：市值 / 累積報酬% / 超額報酬%
@@ -339,10 +310,10 @@ export type Holdings = Map<string, number>; // ticker -> shares
 - 對非致命錯誤（例如單筆列解析失敗）：
   - 預設 **跳過該筆** 並記錄 warning（此行為需在第 10 節確認是否接受）。
 
-### 9.3 分段與恢復（因 submit / tab 切換會 reload）
+### 9.3 分段與恢復（因 submit 會 reload）
 
-- **觸發條件**：每次呼叫 `SubmitForm()/form.submit()` 可能整頁 reload；切換到賣出 tab 也可能 reload。
-- **策略**：將抓取流程拆成多個 stage，並在每次「可能 reload」的動作前先持久化狀態，reload 後自動恢復並繼續下一步。
+- **觸發條件**：每次呼叫 `SubmitForm()/form.submit()` 會觸發整頁 reload。
+- **策略**：將抓取流程拆成多個 stage，並在每次「reload」前先持久化狀態，reload 後自動恢復並繼續下一步。
 - **資料快取（避免重抓）**：
   - 除了 stage 狀態（`chrome.storage.local` / `sessionStorage`）外，另以 **IndexedDB** 持久化：
     - `buyEvents`：`{startYear, endYear, events}`
@@ -350,18 +321,15 @@ export type Holdings = Map<string, number>; // ticker -> shares
   - 設計目的：同一登入情境下，歷史資料（過去交易與歷史收盤價）優先讀快取，降低重複爬蟲與重複 API 請求。
 - **建議 stage（參考）**：
   - `buy_submitted`：已設定買入日期區間並 submit，等待 reload 後解析買入 table
-  - `need_sell_tab`：買入完成，準備切換賣出 tab（可能 reload）
-  - `sell_submitted`：已設定賣出日期區間並 submit，等待 reload 後解析賣出 table
-  - `computing`：買賣資料都完成後，抓 Yahoo 價格、計算、繪圖
+  - `computing`：買入資料完成後，抓 Yahoo 價格、計算、繪圖
 - **儲存位置**：優先 `chrome.storage.local`；無則退回 `sessionStorage`。
 
 ### 9.4 除錯資料落點（建議）
 
 - 為了方便在 DevTools 直接檢查，可將解析後的資料額外 dump 到 `localStorage`（同網域 Application 面板可看）：
   - `pvs_debug_buyEvents_v1`
-  - `pvs_debug_sellEvents_v1`
   - `pvs_debug_events_v1`
-  - `pvs_debug_lastRange_BuyInfo_QueryDateRange` / `pvs_debug_lastRange_SellInfo_QueryDateRange`（用來確認 input value 是否被頁面重設）
+  - `pvs_debug_lastRange_BuyInfo_QueryDateRange`（用來確認 input value 是否被頁面重設）
 
 ---
 
@@ -385,26 +353,22 @@ export type Holdings = Map<string, number>; // ticker -> shares
 
 4. **同日多事件的處理方式（可重現、易測）**  
    - **估值頻率**：同一交易日只輸出一個點（本專案的 trade-day points 定義），且只在處理完當日所有事件後估值一次。  
-   - **同日順序**：為了讓「非法超賣檢查」一致，當日事件處理順序固定為 **BUY → SELL**。  
-   - **同日合併（建議）**：同日同 ticker 的 BUY 可彙總、SELL 可彙總（shares/cash 各自加總）以簡化計算並提升穩定性。
+   - **同日順序**：同日內依原表格出現順序（由上到下）處理 BUY 事件。  
+   - **同日合併（建議）**：同日同 ticker 的 BUY 可彙總（shares/cash 各自加總）以簡化計算並提升穩定性。
 
-5. **賣出超過持倉/負持倉**  
-   - **Portfolio**：不允許負持倉；若發生 `SELL shares > currentHolding`，視為**致命錯誤**（多數投資 app 不會 silently 修正，避免把錯誤資料算成「看起來合理」）。  
-   - **VTI（平行時空）**：預設也不允許 `vtiShares < 0`。若某次 SELL 會導致 `vtiShares` 變負，視為**致命錯誤**（除非未來明確要支援「借券/做空」情境）。
-
-6. **手續費/稅費是否已包含在投入成本/交割金額**  
-   - **預設**：`cash` 欄位（投入成本/交割金額）視為頁面顯示的最終金額，不再額外加減手續費/稅費，避免重複計算。  
+5. **手續費/稅費是否已包含在投入成本**  
+   - **預設**：`cash` 欄位（投入成本）視為頁面顯示的最終金額，不再額外加減手續費/稅費，避免重複計算。  
    - 可將 fee 欄位保留到事件結構供除錯/分析，但不影響本版計算。
 
 7. **Yahoo chart 的 period2 邊界（避免漏掉最後一天）**  
    - **預設**：`period2` 使用「**明天 00:00:00 UTC**」作為右邊界（等價於 today + 1 day 的起點），再用 `isoDateET` 對齊過濾實際需要的日期。  
    - **理由**：許多 API 的 `period2` 為開區間或邊界行為不一；加 1 天 buffer 是同類系統常見的穩健做法。
 
-8. **ECharts 日期格式（最穩定）**  
+7. **ECharts 日期格式（最穩定）**  
    - **預設**：避免依賴瀏覽器對日期字串的 parse；建議用 `xAxis.type = "time"`，series 使用 `[timestampMs, value]` pair：`[[tsMs, v], ...]`。  
    - **理由**：跨瀏覽器/locale 的日期 parse 風險最低，且對 extension 這類環境最穩；測試也更容易做精準比對。
 
-9. **拆股事件套用邊界（同日規則）**  
+8. **拆股事件套用邊界（同日規則）**  
    - **預設**：只套用 `split.isoDateET > trade.isoDateET`，不套用同日（`==`）拆股。  
    - **理由**：同日內交易發生時點與拆股生效時點在來源資料中通常不可得，採嚴格大於可避免同日誤套。
 
@@ -426,4 +390,3 @@ export type Holdings = Map<string, number>; // ticker -> shares
      - `2021-07-20` 前買入事件應套用 `x40`
      - `2021-07-20` 到 `2024-06-10` 間買入事件應套用 `x10`
      - `2024-06-10` 後買入事件應套用 `x1`
-
