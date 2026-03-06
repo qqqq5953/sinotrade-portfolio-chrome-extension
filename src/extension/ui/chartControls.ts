@@ -1,18 +1,8 @@
 /**
  * Chart controls: price/value mode toggles, view mode buttons, yearly summary.
  */
-import { formatNumber, formatPercent } from '../../core/utils/number';
-import {
-  ensureStyle,
-  ensurePvsWrapper,
-  orderWrapperChildren,
-  TOGGLE_ID,
-  YEARLY_SUMMARY_ID,
-  WRAPPER_ID,
-  type PriceMode,
-  type ValueMode,
-  type ViewMode
-} from './extensionUI';
+
+import { ensureStyle, ensurePvsWrapper, orderWrapperChildren, TOGGLE_ID, WRAPPER_ID, type PriceMode, type ValueMode, type ViewMode } from './extensionUI';
 
 export type { ViewMode };
 
@@ -88,51 +78,6 @@ export function renderViewModeButtons(
     if (!v) return;
     b.onclick = () => onChange(v === 'trend' ? 'trend' : parseInt(v, 10));
   });
-}
-
-export function renderYearlySummary(data: {
-  portfolioReturn: number;
-  vtiReturn: number;
-  lastPortfolio?: number;
-  lastVti?: number;
-  valueMode: ValueMode;
-} | null): void {
-  const wrapper = document.getElementById(WRAPPER_ID);
-  if (!wrapper) return;
-  let div = document.getElementById(YEARLY_SUMMARY_ID) as HTMLDivElement | null;
-  if (!data) {
-    div?.remove();
-    return;
-  }
-  if (!div) {
-    div = document.createElement('div');
-    div.id = YEARLY_SUMMARY_ID;
-    wrapper.appendChild(div);
-    orderWrapperChildren(wrapper);
-  }
-  let text = '';
-  if (data.valueMode === 'amount') {
-    const p = formatNumber(data.lastPortfolio);
-    const v = formatNumber(data.lastVti);
-    text = `投資組合：${p}&emsp;|&emsp;VTI 組合：${v}`;
-  } else if (data.valueMode === 'percent') {
-    const pRet = formatPercent(data.portfolioReturn * 100);
-    const vRet = formatPercent(data.vtiReturn * 100);
-    text = `投資組合：${pRet}&emsp;|&emsp;VTI 組合：${vRet}`;
-  } else {
-    const lp = data.lastPortfolio;
-    const lv = data.lastVti;
-    const denom = typeof lv === 'number' && Number.isFinite(lv) && Math.abs(lv) > 1e-12 ? lv : null;
-    const excessPct =
-      denom != null && typeof lp === 'number' && Number.isFinite(lp) ? (lp / denom - 1) * 100 : NaN;
-    text = `超額：${formatPercent(excessPct)}`;
-  }
-  div.innerHTML = `
-    <div class="row" style="font-size:12px; color:#374151; padding:4px 8px; text-align:center;">
-      ${text}
-    </div>
-  `;
-  div.style.display = '';
 }
 
 const INSIGHT_SUMMARY_ID = 'pvs-insight-summary';

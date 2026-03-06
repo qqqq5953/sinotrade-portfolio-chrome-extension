@@ -23,9 +23,8 @@ export const FETCH_STATUS_ICON_ID = 'pvs-fetch-status-icon';
 export const RULES_DETAILS_ID = 'pvs-rules-details';
 export const FETCH_DETAILS_ID = 'pvs-fetch-details';
 
-export const YEARLY_SUMMARY_ID = 'pvs-yearly-summary';
 export const HEADLINE_ID = 'pvs-headline';
-const BLOCK_ORDER = [TOGGLE_ID, 'chart', YEARLY_SUMMARY_ID, RULES_DETAILS_ID, FETCH_DETAILS_ID] as const;
+const BLOCK_ORDER = [TOGGLE_ID, 'chart', RULES_DETAILS_ID, FETCH_DETAILS_ID] as const;
 
 export const MODAL_OVERLAY_ID = 'pvs-daily-detail-modal-overlay';
 export const MODAL_PANEL_ID = 'pvs-daily-detail-modal-panel';

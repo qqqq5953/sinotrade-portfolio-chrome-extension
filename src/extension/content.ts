@@ -26,7 +26,7 @@ import {
   setDailyDetailDataProvider,
   setDailyDetailButtonVisible,
 } from './ui/accordionMount';
-import { renderPriceModeToggle, renderValueModeToggle, renderViewModeButtons, renderYearlySummary, renderInsightSummary } from './ui/chartControls';
+import { renderPriceModeToggle, renderValueModeToggle, renderViewModeButtons, renderInsightSummary } from './ui/chartControls';
 import { renderChartRules, renderPriceFetchReport } from './ui/chartReport';
 import {
   getBuyEvents,
@@ -468,7 +468,6 @@ function buildCloseAdjMaps(): { closeByTicker: Map<string, PriceSeries>; adjByTi
 /** Renders the chart with current viewMode, valueMode (no recompute). */
 function renderChartWithCurrentView(series: ComputedSeries): void {
   if (viewMode === 'trend') {
-    renderYearlySummary(null);
     renderChart(series, {
       valueMode,
       title: '投資組合表現',
@@ -480,18 +479,10 @@ function renderChartWithCurrentView(series: ComputedSeries): void {
   }
   const yearly = computeYearlyReturns(viewMode);
   if (!yearly) {
-    renderYearlySummary(null);
     renderChart(series, { valueMode, useDataZoom: true });
     renderInsightSummary(buildTrendInsightSummary(series));
     return;
   }
-  renderYearlySummary({
-    portfolioReturn: yearly.portfolioReturn,
-    vtiReturn: yearly.vtiReturn,
-    lastPortfolio: yearly.lastPortfolio,
-    lastVti: yearly.lastVti,
-    valueMode,
-  });
   renderChart(yearly.series, {
     valueMode,
     title: `${viewMode} 年投資表現`,
