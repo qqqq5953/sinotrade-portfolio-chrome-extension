@@ -136,6 +136,9 @@ export function buildEchartsOption(
     };
 
     const CHART_PRIMARY_COLOR = PRIMARY_COLOR + 'b3';
+    const isExcess = valueMode === 'excess';
+    const portfolioSeriesName = isExcess ? '相對於 VTI 投資組合的超額報酬 %' : '你的投資組合';
+    const vtiSeriesName = isExcess ? 'baseline' : '只買 VTI';
 
     const baseOption: any = {
         title: {
@@ -148,7 +151,7 @@ export function buildEchartsOption(
         },
         tooltip: { trigger: 'axis', formatter: tooltipFormatter },
         legend: {
-            data: valueMode === 'excess' ? ['相對於 VTI 投資組合的超額報酬 %'] : ['原始投資組合', 'VTI 投資組合'],
+            data: isExcess ? [portfolioSeriesName] : ['你的投資組合', '只買 VTI'],
             top: '16%'
         },
         grid: {
@@ -198,8 +201,8 @@ export function buildEchartsOption(
                         nameTextStyle: { align: 'center', padding: [0, 0, 0, 12], color: '#6b7280' },
                     },
         series: [
-            {
-                name: valueMode === 'excess' ? '相對於 VTI 投資組合的超額報酬 %' : '原始投資組合',
+        {
+                name: portfolioSeriesName,
                 type: 'line',
                 showSymbol: false,
                 clip: false,
@@ -209,7 +212,7 @@ export function buildEchartsOption(
                 data: portfolioData,
             },
             {
-                name: valueMode === 'excess' ? 'baseline' : 'VTI 投資組合',
+                name: vtiSeriesName,
                 type: 'line',
                 showSymbol: false,
                 clip: false,

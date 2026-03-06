@@ -135,6 +135,34 @@ export function renderYearlySummary(data: {
   div.style.display = '';
 }
 
+const INSIGHT_SUMMARY_ID = 'pvs-insight-summary';
+
+export function renderInsightSummary(text: string | null): void {
+  const wrapper = document.getElementById(WRAPPER_ID);
+  if (!wrapper) return;
+  let div = document.getElementById(INSIGHT_SUMMARY_ID) as HTMLDivElement | null;
+  if (!text) {
+    div?.remove();
+    return;
+  }
+  if (!div) {
+    div = document.createElement('div');
+    div.id = INSIGHT_SUMMARY_ID;
+    div.style.fontSize = '12px';
+    div.style.color = '#374151';
+    div.style.padding = '4px 0px 8px 0px';
+  }
+  const chartEl = document.getElementById('chart');
+  if (chartEl && chartEl.parentElement === wrapper) {
+    if (div.parentElement !== wrapper || div.previousSibling !== chartEl) {
+      wrapper.insertBefore(div, chartEl.nextSibling);
+    }
+  } else if (!div.parentElement) {
+    wrapper.appendChild(div);
+  }
+  div.textContent = text;
+}
+
 const VALUE_MODE_TOOLTIPS: Record<ValueMode, string> = {
   amount: '投資組合與 VTI 組合的市值',
   percent: '投資組合與 VTI 組合的累積報酬 % = (市值 / 累積投入金額 - 1) × 100%',

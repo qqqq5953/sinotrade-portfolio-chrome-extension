@@ -15,7 +15,7 @@ import {
   yearRangeText
 } from './collector';
 import { renderChart } from './ui/chartMount';
-import { setChartBlockParent, WRAPPER_ID, type PriceMode, type ValueMode, type ViewMode } from './ui/extensionUI';
+import { setChartBlockParent, WRAPPER_ID, ensureHeadline, type PriceMode, type ValueMode, type ViewMode } from './ui/extensionUI';
 import {
   mountAccordion,
   setAccordionBodyLoading,
@@ -26,7 +26,7 @@ import {
   setDailyDetailDataProvider,
   setDailyDetailButtonVisible,
 } from './ui/accordionMount';
-import { renderPriceModeToggle, renderValueModeToggle, renderViewModeButtons, renderYearlySummary } from './ui/chartControls';
+import { renderPriceModeToggle, renderValueModeToggle, renderViewModeButtons, renderYearlySummary, renderInsightSummary } from './ui/chartControls';
 import { renderChartRules, renderPriceFetchReport } from './ui/chartReport';
 import {
   getBuyEvents,
@@ -38,6 +38,7 @@ import {
 import { clearRunState, loadRunState, saveRunState } from './state';
 import { getStopEventName, setStatus, setStatusDone, setStatusError } from './status';
 import type { YahooFetchResp, YahooProxyError } from './yahooProxyTypes';
+import { formatNumber, formatPercent, pad2 } from '../core/utils/number';
 
 // BUY-only mode: compare incremental BUY cashflow performance
 // from the site's earliest allowed date (daterangepicker.minDate) to today.
@@ -139,6 +140,106 @@ function computeYearlyReturns(year: number): {
     lastPortfolio,
     lastVti,
   };
+}
+
+function getSeriesDateRangeLabels(series: ComputedSeries): { rangeLabel: string; endLabel: string } {
+  const pts = series.portfolio;
+  if (!Array.isArray(pts) || pts.length === 0) {
+    return { rangeLabel: '', endLabel: '' };
+  }
+  const first = new Date(pts[0]!.tsMs);
+  const last = new Date(pts[pts.length - 1]!.tsMs);
+  const fmtYM = (d: Date) => `${d.getFullYear()}/${pad2(d.getMonth() + 1)}`;
+  const fmtYMD = (d: Date) =>
+    `${d.getFullYear()}/${pad2(d.getMonth() + 1)}/${pad2(d.getDate())}`;
+  return {
+    rangeLabel: `${fmtYM(first)}–${fmtYM(last)}`,
+    endLabel: fmtYMD(last),
+  };
+}
+
+function getTotalCashForEvents(events: TradeEvent[] | null): number {
+  if (!events || events.length === 0) return 0;
+  let total = 0;
+  for (const e of events) {
+    const cash = typeof e.cash === 'number' && Number.isFinite(e.cash) ? e.cash : 0;
+    total += cash;
+  }
+  return total;
+}
+
+function buildTrendInsightSummary(series: ComputedSeries): string | null {
+  const portfolioPoints = series.portfolio;
+  const vtiPoints = series.vti;
+  if (!Array.isArray(portfolioPoints) || portfolioPoints.length === 0) return null;
+  if (!Array.isArray(vtiPoints) || vtiPoints.length === 0) return null;
+
+  const { rangeLabel, endLabel } = getSeriesDateRangeLabels(series);
+  const lastPortfolio = portfolioPoints[portfolioPoints.length - 1]!.value ?? 0;
+  const lastVti = vtiPoints[vtiPoints.length - 1]!.value ?? 0;
+
+  if (valueMode === 'amount') {
+    const diffAmount = lastPortfolio - lastVti;
+    return `截至 ${endLabel}，你的投資組合市值約 ${formatNumber(
+      lastPortfolio
+    )}，只買 VTI 約 ${formatNumber(lastVti)}，相差約 ${formatNumber(diffAmount)}。`;
+  }
+
+  if (valueMode === 'percent') {
+    const totalCash = getTotalCashForEvents(cachedEvents);
+    if (!(typeof totalCash === 'number' && Number.isFinite(totalCash) && totalCash > 1e-12)) {
+      return null;
+    }
+    const portfolioReturnPct = (lastPortfolio / totalCash - 1) * 100;
+    const vtiReturnPct = (lastVti / totalCash - 1) * 100;
+    const diffPct = portfolioReturnPct - vtiReturnPct;
+    return `在 ${rangeLabel} 之間，你的投資組合累積報酬約 ${formatPercent(
+      portfolioReturnPct
+    )}，只買 VTI 約 ${formatPercent(vtiReturnPct)}，相對只買 VTI 約 ${formatPercent(
+      diffPct
+    )}。`;
+  }
+
+  // valueMode === 'excess'
+  if (!(typeof lastVti === 'number' && Number.isFinite(lastVti) && Math.abs(lastVti) > 1e-12)) {
+    return null;
+  }
+  const excessPct = (lastPortfolio / lastVti - 1) * 100;
+  return `在 ${rangeLabel} 之間，你的投資組合相對只買 VTI 的超額報酬約 ${formatPercent(
+    excessPct
+  )}。`;
+}
+
+function buildYearlyInsightSummary(
+  year: number,
+  yearly: {
+    portfolioReturn: number;
+    vtiReturn: number;
+    lastPortfolio: number;
+    lastVti: number;
+  }
+): string | null {
+  const pRetPct = yearly.portfolioReturn * 100;
+  const vRetPct = yearly.vtiReturn * 100;
+
+  if (valueMode === 'amount') {
+    return `${year} 年，你的投資組合期末市值約 ${formatNumber(
+      yearly.lastPortfolio
+    )}，只買 VTI 約 ${formatNumber(yearly.lastVti)}。`;
+  }
+
+  if (valueMode === 'percent') {
+    const diffPct = pRetPct - vRetPct;
+    return `${year} 年，你的投資組合報酬約 ${formatPercent(
+      pRetPct
+    )}，只買 VTI 約 ${formatPercent(vRetPct)}，相對只買 VTI 約 ${formatPercent(diffPct)}。`;
+  }
+
+  if (!(typeof yearly.lastVti === 'number' && Number.isFinite(yearly.lastVti) && Math.abs(yearly.lastVti) > 1e-12)) {
+    return `${year} 年，VTI 資料不足，無法計算超額報酬。`;
+  }
+  const excessPct = (yearly.lastPortfolio / yearly.lastVti - 1) * 100;
+  return `${year} 年，你的投資組合相對只買 VTI 的超額報酬約 ${formatPercent(excessPct)}。`;
 }
 
 
@@ -374,12 +475,14 @@ function renderChartWithCurrentView(series: ComputedSeries): void {
       subtext: '含所有年度累積',
       useDataZoom: true,
     });
+    renderInsightSummary(buildTrendInsightSummary(series));
     return;
   }
   const yearly = computeYearlyReturns(viewMode);
   if (!yearly) {
     renderYearlySummary(null);
     renderChart(series, { valueMode, useDataZoom: true });
+    renderInsightSummary(buildTrendInsightSummary(series));
     return;
   }
   renderYearlySummary({
@@ -395,6 +498,7 @@ function renderChartWithCurrentView(series: ComputedSeries): void {
     subtext: '該年度新增投入的報酬',
     useDataZoom: false,
   });
+  renderInsightSummary(buildYearlyInsightSummary(Number(viewMode), yearly));
 }
 
 function recomputeAndRender(): void {
@@ -424,6 +528,7 @@ function updateChartView(): void {
 }
 
 function renderToggles(): void {
+  ensureHeadline();
   renderPriceModeToggle(priceMode, (m) => {
     if (priceMode === m) return;
     priceMode = m;

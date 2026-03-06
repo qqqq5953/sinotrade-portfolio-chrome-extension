@@ -24,6 +24,7 @@ export const RULES_DETAILS_ID = 'pvs-rules-details';
 export const FETCH_DETAILS_ID = 'pvs-fetch-details';
 
 export const YEARLY_SUMMARY_ID = 'pvs-yearly-summary';
+export const HEADLINE_ID = 'pvs-headline';
 const BLOCK_ORDER = [TOGGLE_ID, 'chart', YEARLY_SUMMARY_ID, RULES_DETAILS_ID, FETCH_DETAILS_ID] as const;
 
 export const MODAL_OVERLAY_ID = 'pvs-daily-detail-modal-overlay';
@@ -229,12 +230,6 @@ export function ensureStyle(): void {
 #${RULES_ID} li + li {
     margin-top: 2px;
 }
-#${WRAPPER_ID} {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    padding: 8px 0px;
-}
 #${ACCORDION_ID} .${FETCH_STATUS_ICON_ID},
 #${ACCORDION_ID} .pvs-header-icon-btn {
     display: inline-flex;
@@ -374,6 +369,18 @@ export function ensureStyle(): void {
 #${RULES_ID} li + li {
     margin-top: 2px;
 }
+#${WRAPPER_ID} {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 8px 0px;
+}
+#${HEADLINE_ID} {
+    font-size: 14px;
+    font-weight: 600;
+    color: ${PRIMARY_COLOR};
+    padding: 4px 0 0;
+}
 `;
   document.head.appendChild(style);
 }
@@ -413,4 +420,17 @@ export function ensurePvsWrapper(): HTMLDivElement {
     if (el && (el.parentElement === tagArea || el.parentElement?.id === ACCORDION_BODY_ID)) wrapper.appendChild(el);
   }
   return wrapper;
+}
+
+export function ensureHeadline(): HTMLDivElement {
+  ensureStyle();
+  const wrapper = ensurePvsWrapper();
+  let headline = document.getElementById(HEADLINE_ID) as HTMLDivElement | null;
+  if (!headline) {
+    headline = document.createElement('div');
+    headline.id = HEADLINE_ID;
+    headline.textContent = '你的選股策略，有比只買大盤更划算嗎？';
+    wrapper.insertBefore(headline, wrapper.firstChild);
+  }
+  return headline;
 }
